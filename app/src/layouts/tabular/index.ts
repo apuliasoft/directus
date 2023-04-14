@@ -43,15 +43,14 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 
 		const { info, primaryKeyField, fields: fieldsInCollection, sortField } = useCollection(collection);
 
-		const { sort, limit, page, fields, fieldsWithRelational } = useItemOptions();
+		const { sort, limit, page, fields } = useItemOptions();
 
-		const { aliasFields, aliasQuery } = useAliasFields(fieldsWithRelational);
+		const { aliasedFields, aliasQuery } = useAliasFields(fields, collection);
 
 		const fieldsWithRelationalAliased = computed(() => {
-			if (!aliasFields.value) return fieldsWithRelational.value;
-			return fieldsWithRelational.value.map((field) =>
-				aliasFields.value?.[field] ? aliasFields.value[field].fullAlias : field
-			);
+			return Object.values(aliasedFields.value).reduce<string[]>((acc, value) => {
+				return [...acc, ...value.fields];
+			}, []);
 		});
 
 		const {
@@ -123,6 +122,7 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 			filter,
 			search,
 			download,
+			fieldsWithRelationalAliased,
 		};
 
 		async function resetPresetAndRefresh() {
@@ -230,32 +230,23 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 							description = fieldNames.join(' -> ');
 
 							const types = relationsStore.getRelationTypes(collection.value!, field.key);
-
-							if (types.at(-1) === 'o2m') {
-								const arrayField = fieldsStore.getField(collection.value!, fieldParts.slice(0, -1).join('.'));
-								let display;
-								let displayOptions;
-
-								if (arrayField?.meta?.display) {
-									display = arrayField.meta.display;
-									displayOptions = arrayField.meta.display_options;
-								} else {
-									display = 'related-values';
-									displayOptions = {
-										template: `{{${fieldParts.at(-1)}}}`,
-									};
-								}
-
+							const arrayField = fieldsStore.getField(collection.value!, fieldParts.slice(0, -1).join('.'));
+							
+							// Special case for translations to render the nested data in the translations display instead of the default display
+							if (types.at(-1) === 'o2m' && arrayField?.meta?.special?.includes('translations')) {
 								if (arrayField)
 									return {
 										text: field.name,
-										value: arrayField.field,
+										value: field.key,
+										key: fieldParts.slice(0, -1).join('.'),
 										description,
 										width: localWidths.value[field.key] || layoutOptions.value?.widths?.[field.key] || null,
 										align: layoutOptions.value?.align?.[field.key] || 'left',
 										field: {
-											display,
-											displayOptions,
+											display: 'translations',
+											displayOptions: {
+												template: `{{${fieldParts.at(-1)}}}`,
+											},
 											interface: arrayField.meta?.interface,
 											interfaceOptions: arrayField.meta?.options,
 											type: arrayField.type,
@@ -270,6 +261,7 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 						return {
 							text: field.name,
 							value: field.key,
+							key: field.key,
 							description,
 							width: localWidths.value[field.key] || layoutOptions.value?.widths?.[field.key] || null,
 							align: layoutOptions.value?.align?.[field.key] || 'left',
