@@ -32,8 +32,16 @@
 				<v-icon v-else :name="collapseIcon" />
 			</template>
 			<collection-options :collection="collection" />
+			<template v-if="nestedCollections.length">
+				<v-icon 
+					clickable name="chevron_right" 
+					@click.stop.prevent="collapseChildren"
+					class="activator-icon"
+					:class="{ active: childrenVisibility }"
+				/>
+			</template>
 		</v-list-item>
-
+		
 		<draggable
 			:force-fallback="true"
 			:model-value="nestedCollections"
@@ -46,6 +54,7 @@
 		>
 			<template #item="{ element }">
 				<collection-item
+					:class="{ hide: !childrenVisibility }"
 					:collection="element"
 					:collections="collections"
 					@edit-collection="$emit('editCollection', $event)"
@@ -120,6 +129,10 @@ export default defineComponent({
 
 		const collapseLoading = ref(false);
 
+		const showChildrenKey = '-data-model-show-children';
+		const data = localStorage.getItem(props.collection.collection + showChildrenKey);
+		const childrenVisibility = ref(data ? JSON.parse(data) : false);
+
 		return {
 			collapseIcon,
 			onGroupSortChange,
@@ -128,7 +141,14 @@ export default defineComponent({
 			toggleCollapse,
 			collapseTooltip,
 			collapseLoading,
+			childrenVisibility,
+			collapseChildren
 		};
+
+		function collapseChildren() {
+			childrenVisibility.value = !childrenVisibility.value;
+			localStorage.setItem(props.collection.collection + showChildrenKey, JSON.stringify(childrenVisibility.value));
+		}
 
 		async function toggleCollapse() {
 			if (collapseLoading.value === true) return;
@@ -170,7 +190,7 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .drag-container {
 	margin-top: 8px;
 	margin-left: 20px;
@@ -178,6 +198,10 @@ export default defineComponent({
 
 .collection-item {
 	margin-bottom: 8px;
+
+	&.hide {
+		display: none;
+	}
 }
 
 .collection-item-detail {
@@ -198,6 +222,14 @@ export default defineComponent({
 	color: var(--foreground-subdued);
 }
 
+.activator-icon {
+	transform: rotate(0deg);
+	transition: transform var(--medium) var(--transition);
+
+	&.active {
+		transform: rotate(90deg);
+	}
+}
 .collection-note {
 	margin-left: 16px;
 	overflow: hidden;
