@@ -244,7 +244,7 @@ function setSelection(selection: number[]) {
 function onUpload(fileInfo: FileInfo) {
 	file.value = fileInfo;
 	activeDialog.value = null;
-	update(fileInfo.id);
+	update(fileInfo);
 }
 
 function useURLImport() {
