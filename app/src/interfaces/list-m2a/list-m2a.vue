@@ -107,7 +107,7 @@
 				</v-list>
 			</v-menu>
 
-			<v-pagination v-if="pageCount > 1" v-model="page" :length="pageCount" :total-visible="5" />
+			<v-pagination v-if="!relationInfo?.sortField && pageCount > 1" v-model="page" :length="pageCount" :total-visible="5" />
 		</div>
 
 		<drawer-collection
@@ -215,7 +215,7 @@ const page = ref(1);
 
 const query = computed<RelationQueryMultiple>(() => ({
 	fields: fields.value,
-	limit: limit.value,
+	limit: (!relationInfo?.value?.sortField) ? limit.value : -1,
 	page: page.value,
 }));
 
@@ -236,7 +236,7 @@ const {
 const pageCount = computed(() => Math.ceil(totalItemCount.value / limit.value));
 
 const allowDrag = computed(
-	() => totalItemCount.value <= limit.value && relationInfo.value?.sortField !== undefined && !props.disabled
+	() => relationInfo.value?.sortField !== undefined && !props.disabled
 );
 
 function getDeselectIcon(item: DisplayItem) {

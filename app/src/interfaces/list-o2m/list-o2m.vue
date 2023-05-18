@@ -162,7 +162,7 @@
 						{{ t('add_existing') }}
 					</v-button>
 					<div class="spacer" />
-					<v-pagination v-if="pageCount > 1" v-model="page" :length="pageCount" :total-visible="5" />
+					<v-pagination v-if="!relationInfo?.sortField && pageCount > 1" v-model="page" :length="pageCount" :total-visible="5" />
 				</template>
 			</div>
 		</div>
@@ -190,27 +190,27 @@
 </template>
 
 <script setup lang="ts">
+import { Sort } from '@/components/v-table/types';
+import { DisplayItem, RelationQueryMultiple, useRelationMultiple } from '@/composables/use-relation-multiple';
 import { useRelationO2M } from '@/composables/use-relation-o2m';
-import { useRelationMultiple, RelationQueryMultiple, DisplayItem } from '@/composables/use-relation-multiple';
+import { useFieldsStore } from '@/stores/fields';
+import { usePermissionsStore } from '@/stores/permissions';
+import { useUserStore } from '@/stores/user';
+import { LAYOUTS } from '@/types/interfaces';
+import { addRelatedPrimaryKeyToFields } from '@/utils/add-related-primary-key-to-fields';
+import { adjustFieldsForDisplays } from '@/utils/adjust-fields-for-displays';
+import { formatCollectionItemsCount } from '@/utils/format-collection-items-count';
 import { parseFilter } from '@/utils/parse-filter';
+import DrawerCollection from '@/views/private/components/drawer-collection.vue';
+import DrawerItem from '@/views/private/components/drawer-item.vue';
+import SearchInput from '@/views/private/components/search-input.vue';
 import { Filter } from '@directus/shared/types';
 import { deepMap, getFieldsFromTemplate } from '@directus/shared/utils';
+import { clamp, get, isEmpty, isNil } from 'lodash';
 import { render } from 'micromustache';
 import { computed, inject, ref, toRefs, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import SearchInput from '@/views/private/components/search-input.vue';
-import DrawerItem from '@/views/private/components/drawer-item.vue';
-import DrawerCollection from '@/views/private/components/drawer-collection.vue';
-import { Sort } from '@/components/v-table/types';
 import Draggable from 'vuedraggable';
-import { adjustFieldsForDisplays } from '@/utils/adjust-fields-for-displays';
-import { isEmpty, clamp, get, isNil } from 'lodash';
-import { usePermissionsStore } from '@/stores/permissions';
-import { useUserStore } from '@/stores/user';
-import { useFieldsStore } from '@/stores/fields';
-import { LAYOUTS } from '@/types/interfaces';
-import { formatCollectionItemsCount } from '@/utils/format-collection-items-count';
-import { addRelatedPrimaryKeyToFields } from '@/utils/add-related-primary-key-to-fields';
 
 const props = withDefaults(
 	defineProps<{
@@ -292,7 +292,7 @@ const sort = ref<Sort>();
 
 const query = computed<RelationQueryMultiple>(() => {
 	const q: RelationQueryMultiple = {
-		limit: limit.value,
+		limit: (props.layout === LAYOUTS.TABLE || !relationInfo?.value?.sortField) ? limit.value : -1,
 		page: page.value,
 		fields: fields.value || ['id'],
 	};
@@ -394,7 +394,7 @@ const spacings = {
 const tableRowHeight = computed(() => spacings[props.tableSpacing] ?? spacings.cozy);
 
 const allowDrag = computed(
-	() => totalItemCount.value <= limit.value && relationInfo.value?.sortField !== undefined && !props.disabled
+	() => relationInfo.value?.sortField !== undefined && !props.disabled
 );
 
 function getDeselectIcon(item: DisplayItem) {
