@@ -122,6 +122,16 @@ export function useRelationMultiple(
 			if (editsIndex !== -1) {
 				const edits = unref(_value.value.update[editsIndex]);
 
+				if (relation.value?.type === 'm2m' || relation.value?.type === 'm2a') {
+					const relKey = relation.value.junctionField.field;
+					const rel = updatedItem[relation.value.junctionField.field];
+					Object.keys(rel).forEach(k => {
+						if (Array.isArray(rel[k])) {
+							edits[relKey][k] = [...rel[k], ...(edits[relKey][k]?.update ?? []), ...(edits[relKey][k]?.create ?? [])];
+						} 
+					});
+				}
+
 				updatedItem = {
 					...updatedItem,
 					...edits,
