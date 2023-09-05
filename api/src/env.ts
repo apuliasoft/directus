@@ -3,12 +3,16 @@
  * For all possible keys, see: https://docs.directus.io/self-hosted/config-options/
  */
 
+import { parseJSON, toArray } from '@directus/utils';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import { clone, toNumber, toString } from 'lodash';
+import { clone, toNumber, toString } from 'lodash-es';
 import path from 'path';
-import { requireYAML } from './utils/require-yaml';
-import { toArray, parseJSON } from '@directus/shared/utils';
+import { requireYAML } from './utils/require-yaml.js';
+
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 // keeping this here for now to prevent a circular import to constants.ts
 const allowedEnvironmentVars = [
@@ -23,7 +27,10 @@ const allowedEnvironmentVars = [
 	'ROOT_REDIRECT',
 	'SERVE_APP',
 	'GRAPHQL_INTROSPECTION',
+	'MAX_BATCH_MUTATION',
 	'LOGGER_.+',
+	'QUERY_LIMIT_MAX',
+	'QUERY_LIMIT_DEFAULT',
 	'ROBOTS_TXT',
 	// server
 	'SERVER_.+',
@@ -65,6 +72,7 @@ const allowedEnvironmentVars = [
 	'CACHE_TTL',
 	'CACHE_CONTROL_S_MAXAGE',
 	'CACHE_AUTO_PURGE',
+	'CACHE_AUTO_PURGE_IGNORE_LIST',
 	'CACHE_SYSTEM_TTL',
 	'CACHE_SCHEMA',
 	'CACHE_PERMISSIONS',
@@ -99,6 +107,11 @@ const allowedEnvironmentVars = [
 	'STORAGE_.+_HEALTHCHECK_THRESHOLD',
 	// metadata
 	'FILE_METADATA_ALLOW_LIST',
+
+	// files
+	'FILES_MAX_UPLOAD_SIZE',
+	'FILES_CONTENT_TYPE_ALLOW_LIST',
+
 	// assets
 	'ASSETS_CACHE_TTL',
 	'ASSETS_TRANSFORM_MAX_CONCURRENT',
@@ -154,6 +167,13 @@ const allowedEnvironmentVars = [
 	'MESSENGER_REDIS_HOST',
 	'MESSENGER_REDIS_PORT',
 	'MESSENGER_REDIS_PASSWORD',
+	// synchronization
+	'SYNCHRONIZATION_STORE',
+	'SYNCHRONIZATION_NAMESPACE',
+	'SYNCHRONIZATION_REDIS',
+	'SYNCHRONIZATION_REDIS_HOST',
+	'SYNCHRONIZATION_REDIS_PORT',
+	'SYNCHRONIZATION_REDIS_PASSWORD',
 	// emails
 	'EMAIL_FROM',
 	'EMAIL_TRANSPORT',
@@ -198,6 +218,8 @@ const defaults: Record<string, any> = {
 	PUBLIC_URL: '/',
 	MAX_PAYLOAD_SIZE: '1mb',
 	MAX_RELATIONAL_DEPTH: 10,
+	QUERY_LIMIT_DEFAULT: 100,
+	MAX_BATCH_MUTATION: Infinity,
 	ROBOTS_TXT: 'User-agent: *\nDisallow: /',
 
 	DB_EXCLUDE_TABLES: 'spatial_ref_sys,sysdiagrams',
@@ -223,6 +245,7 @@ const defaults: Record<string, any> = {
 	REFRESH_TOKEN_COOKIE_NAME: 'directus_refresh_token',
 
 	LOGIN_STALL_TIME: 500,
+	SERVER_SHUTDOWN_TIMEOUT: 1000,
 
 	ROOT_REDIRECT: './admin',
 
@@ -239,6 +262,7 @@ const defaults: Record<string, any> = {
 	CACHE_TTL: '5m',
 	CACHE_NAMESPACE: 'system-cache',
 	CACHE_AUTO_PURGE: false,
+	CACHE_AUTO_PURGE_IGNORE_LIST: 'directus_activity,directus_presets',
 	CACHE_CONTROL_S_MAXAGE: '0',
 	CACHE_SCHEMA: true,
 	CACHE_PERMISSIONS: true,
@@ -261,7 +285,7 @@ const defaults: Record<string, any> = {
 	TELEMETRY: true,
 
 	ASSETS_CACHE_TTL: '30d',
-	ASSETS_TRANSFORM_MAX_CONCURRENT: 1,
+	ASSETS_TRANSFORM_MAX_CONCURRENT: 25,
 	ASSETS_TRANSFORM_IMAGE_MAX_DIMENSION: 6000,
 	ASSETS_TRANSFORM_MAX_OPERATIONS: 5,
 	ASSETS_TRANSFORM_TIMEOUT: '7500ms',
@@ -284,6 +308,16 @@ const defaults: Record<string, any> = {
 
 	FLOWS_EXEC_ALLOWED_MODULES: false,
 	FLOWS_ENV_ALLOW_LIST: false,
+
+	PRESSURE_LIMITER_ENABLED: true,
+	PRESSURE_LIMITER_SAMPLE_INTERVAL: 250,
+	PRESSURE_LIMITER_MAX_EVENT_LOOP_UTILIZATION: 0.99,
+	PRESSURE_LIMITER_MAX_EVENT_LOOP_DELAY: 500,
+	PRESSURE_LIMITER_MAX_MEMORY_RSS: false,
+	PRESSURE_LIMITER_MAX_MEMORY_HEAP_USED: false,
+	PRESSURE_LIMITER_RETRY_AFTER: false,
+
+	FILES_MIME_TYPE_ALLOW_LIST: '*/*',
 };
 
 // Allows us to force certain environment variable into a type, instead of relying
@@ -301,12 +335,17 @@ const typeMap: Record<string, string> = {
 	DB_EXCLUDE_TABLES: 'array',
 
 	CACHE_SKIP_ALLOWED: 'boolean',
+	CACHE_AUTO_PURGE_IGNORE_LIST: 'array',
 
 	IMPORT_IP_DENY_LIST: 'array',
 
 	FILE_METADATA_ALLOW_LIST: 'array',
 
 	GRAPHQL_INTROSPECTION: 'boolean',
+
+	MAX_BATCH_MUTATION: 'number',
+
+	SERVER_SHUTDOWN_TIMEOUT: 'number',
 };
 
 let env: Record<string, any> = {
@@ -343,7 +382,7 @@ export function refreshEnv(): void {
 }
 
 function processConfiguration() {
-	const configPath = path.resolve(process.env.CONFIG_PATH || defaults.CONFIG_PATH);
+	const configPath = path.resolve(process.env['CONFIG_PATH'] || defaults['CONFIG_PATH']);
 
 	if (fs.existsSync(configPath) === false) return {};
 
@@ -395,13 +434,14 @@ function getEnvironmentValueWithPrefix(envArray: Array<string>): Array<string | 
 		if (isEnvSyntaxPrefixPresent(item)) {
 			return getEnvironmentValueByType(item);
 		}
+
 		return item;
 	});
 }
 
 function getEnvironmentValueByType(envVariableString: string) {
-	const variableType = getVariableType(envVariableString);
-	const envVariableValue = getEnvVariableValue(envVariableString, variableType);
+	const variableType = getVariableType(envVariableString)!;
+	const envVariableValue = getEnvVariableValue(envVariableString, variableType)!;
 
 	switch (variableType) {
 		case 'number':
@@ -428,14 +468,17 @@ function processValues(env: Record<string, any>) {
 		// If key ends with '_FILE', try to get the value from the file defined in this variable
 		// and store it in the variable with the same name but without '_FILE' at the end
 		let newKey: string | undefined;
+
 		if (key.length > 5 && key.endsWith('_FILE')) {
 			newKey = key.slice(0, -5);
+
 			if (allowedEnvironmentVars.some((pattern) => pattern.test(newKey as string))) {
 				if (newKey in env && !(newKey in defaults && env[newKey] === defaults[newKey])) {
 					throw new Error(
 						`Duplicate environment variable encountered: you can't use "${newKey}" and "${key}" simultaneously.`
 					);
 				}
+
 				try {
 					value = fs.readFileSync(value, { encoding: 'utf8' });
 					key = newKey;
@@ -470,6 +513,7 @@ function processValues(env: Record<string, any>) {
 				case 'boolean':
 					env[key] = toBoolean(value);
 			}
+
 			continue;
 		}
 

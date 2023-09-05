@@ -5,11 +5,11 @@
 			<v-list-item-content>{{ restricted ? t('view_raw_value') : t('edit_raw_value') }}</v-list-item-content>
 		</v-list-item>
 		<v-list-item v-if="isCopySupported" :disabled="modelValue === null" clickable @click="$emit('copy-raw')">
-			<v-list-item-icon><v-icon name="copy_outline" /></v-list-item-icon>
+			<v-list-item-icon><v-icon name="content_copy" /></v-list-item-icon>
 			<v-list-item-content>{{ t('copy_raw_value') }}</v-list-item-content>
 		</v-list-item>
 		<v-list-item v-if="isPasteSupported && !restricted" clickable @click="$emit('paste-raw')">
-			<v-list-item-icon><v-icon name="paste_outline" /></v-list-item-icon>
+			<v-list-item-icon><v-icon name="content_paste" /></v-list-item-icon>
 			<v-list-item-content>{{ t('paste_raw_value') }}</v-list-item-content>
 		</v-list-item>
 		<v-divider v-if="!restricted" />
@@ -41,20 +41,20 @@
 			clickable
 			@click="$emit('update:modelValue', null)"
 		>
-			<v-list-item-icon><v-icon name="delete_outline" /></v-list-item-icon>
+			<v-list-item-icon><v-icon name="delete" /></v-list-item-icon>
 			<v-list-item-content>{{ t('clear_value') }}</v-list-item-content>
 		</v-list-item>
 	</v-list>
 </template>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n';
-import { computed } from 'vue';
-import { Field } from '@directus/shared/types';
 import { useClipboard } from '@/composables/use-clipboard';
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import type { FormField } from './types';
 
 interface Props {
-	field: Field;
+	field: FormField;
 	modelValue?: string | number | boolean | Record<string, any> | Array<any> | null;
 	initialValue?: string | number | boolean | Record<string, any> | Array<any> | null;
 	restricted?: boolean;

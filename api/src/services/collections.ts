@@ -1,22 +1,30 @@
-import SchemaInspector from '@directus/schema';
-import { Knex } from 'knex';
-import { getCache, clearSystemCache } from '../cache';
-import { ALIAS_TYPES } from '../constants';
-import getDatabase, { getSchemaInspector } from '../database';
-import { systemCollectionRows } from '../database/system-data/collections';
-import env from '../env';
-import { ForbiddenException, InvalidPayloadException } from '../exceptions';
-import { FieldsService } from '../services/fields';
-import { ItemsService } from '../services/items';
-import Keyv from 'keyv';
-import { AbstractServiceOptions, ActionEventParams, Collection, CollectionMeta, MutationOptions } from '../types';
-import { Accountability, FieldMeta, RawField, SchemaOverview } from '@directus/shared/types';
-import { Table } from 'knex-schema-inspector/dist/types/table';
-import { addFieldFlag } from '@directus/shared/utils';
-import { getHelpers, Helpers } from '../database/helpers';
-import { omit } from 'lodash';
-import { getSchema } from '../utils/get-schema';
-import emitter from '../emitter';
+import type { SchemaInspector, Table } from '@directus/schema';
+import { createInspector } from '@directus/schema';
+import type { Accountability, FieldMeta, RawField, SchemaOverview } from '@directus/types';
+import { addFieldFlag } from '@directus/utils';
+import type Keyv from 'keyv';
+import type { Knex } from 'knex';
+import { chunk, omit } from 'lodash-es';
+import { clearSystemCache, getCache } from '../cache.js';
+import { ALIAS_TYPES } from '../constants.js';
+import type { Helpers } from '../database/helpers/index.js';
+import { getHelpers } from '../database/helpers/index.js';
+import getDatabase, { getSchemaInspector } from '../database/index.js';
+import { systemCollectionRows } from '../database/system-data/collections/index.js';
+import emitter from '../emitter.js';
+import env from '../env.js';
+import { ForbiddenException, InvalidPayloadException } from '../exceptions/index.js';
+import { FieldsService } from '../services/fields.js';
+import { ItemsService } from '../services/items.js';
+import type {
+	AbstractServiceOptions,
+	ActionEventParams,
+	Collection,
+	CollectionMeta,
+	MutationOptions,
+} from '../types/index.js';
+import { getSchema } from '../utils/get-schema.js';
+import { shouldClearCache } from '../utils/should-clear-cache.js';
 
 export type RawCollection = {
 	collection: string;
@@ -29,7 +37,7 @@ export class CollectionsService {
 	knex: Knex;
 	helpers: Helpers;
 	accountability: Accountability | null;
-	schemaInspector: ReturnType<typeof SchemaInspector>;
+	schemaInspector: SchemaInspector;
 	schema: SchemaOverview;
 	cache: Keyv<any> | null;
 	systemCache: Keyv<any>;
@@ -38,7 +46,7 @@ export class CollectionsService {
 		this.knex = options.knex || getDatabase();
 		this.helpers = getHelpers(this.knex);
 		this.accountability = options.accountability || null;
-		this.schemaInspector = options.knex ? SchemaInspector(options.knex) : getSchemaInspector();
+		this.schemaInspector = options.knex ? createInspector(options.knex) : getSchemaInspector();
 		this.schema = options.schema;
 
 		const { cache, systemCache } = getCache();
@@ -81,7 +89,7 @@ export class CollectionsService {
 					// Directus heavily relies on the primary key of a collection, so we have to make sure that
 					// every collection that is created has a primary key. If no primary key field is created
 					// while making the collection, we default to an auto incremented id named `id`
-					if (!payload.fields)
+					if (!payload.fields) {
 						payload.fields = [
 							{
 								field: 'id',
@@ -97,6 +105,7 @@ export class CollectionsService {
 								},
 							},
 						];
+					}
 
 					// Ensure that every field meta has the field/collection fields filled correctly
 					payload.fields = payload.fields.map((field) => {
@@ -110,6 +119,7 @@ export class CollectionsService {
 
 						// Add flag for specific database type overrides
 						const flagToAdd = this.helpers.date.fieldFlagForField(field.type);
+
 						if (flagToAdd) {
 							addFieldFlag(field, flagToAdd);
 						}
@@ -134,9 +144,11 @@ export class CollectionsService {
 					});
 
 					const fieldPayloads = payload.fields!.filter((field) => field.meta).map((field) => field.meta) as FieldMeta[];
+
 					await fieldItemsService.createMany(fieldPayloads, {
 						bypassEmitAction: (params) =>
 							opts?.bypassEmitAction ? opts.bypassEmitAction(params) : nestedActionEvents.push(params),
+						bypassLimits: true,
 					});
 				}
 
@@ -164,12 +176,12 @@ export class CollectionsService {
 
 			return payload.collection;
 		} finally {
-			if (this.cache && env.CACHE_AUTO_PURGE && opts?.autoPurgeCache !== false) {
+			if (shouldClearCache(this.cache, opts)) {
 				await this.cache.clear();
 			}
 
 			if (opts?.autoPurgeSystemCache !== false) {
-				await clearSystemCache();
+				await clearSystemCache({ autoPurgeCache: opts?.autoPurgeCache });
 			}
 
 			if (opts?.emitEvents !== false && nestedActionEvents.length > 0) {
@@ -205,6 +217,7 @@ export class CollectionsService {
 						autoPurgeSystemCache: false,
 						bypassEmitAction: (params) => nestedActionEvents.push(params),
 					});
+
 					collectionNames.push(name);
 				}
 
@@ -213,12 +226,12 @@ export class CollectionsService {
 
 			return collections;
 		} finally {
-			if (this.cache && env.CACHE_AUTO_PURGE && opts?.autoPurgeCache !== false) {
+			if (shouldClearCache(this.cache, opts)) {
 				await this.cache.clear();
 			}
 
 			if (opts?.autoPurgeSystemCache !== false) {
-				await clearSystemCache();
+				await clearSystemCache({ autoPurgeCache: opts?.autoPurgeCache });
 			}
 
 			if (opts?.emitEvents !== false && nestedActionEvents.length > 0) {
@@ -306,8 +319,8 @@ export class CollectionsService {
 			}
 		}
 
-		if (env.DB_EXCLUDE_TABLES) {
-			return collections.filter((collection) => env.DB_EXCLUDE_TABLES.includes(collection.collection) === false);
+		if (env['DB_EXCLUDE_TABLES']) {
+			return collections.filter((collection) => env['DB_EXCLUDE_TABLES'].includes(collection.collection) === false);
 		}
 
 		return collections;
@@ -321,7 +334,7 @@ export class CollectionsService {
 
 		if (result.length === 0) throw new ForbiddenException();
 
-		return result[0];
+		return result[0]!;
 	}
 
 	/**
@@ -396,12 +409,12 @@ export class CollectionsService {
 
 			return collectionKey;
 		} finally {
-			if (this.cache && env.CACHE_AUTO_PURGE && opts?.autoPurgeCache !== false) {
+			if (shouldClearCache(this.cache, opts)) {
 				await this.cache.clear();
 			}
 
 			if (opts?.autoPurgeSystemCache !== false) {
-				await clearSystemCache();
+				await clearSystemCache({ autoPurgeCache: opts?.autoPurgeCache });
 			}
 
 			if (opts?.emitEvents !== false && nestedActionEvents.length > 0) {
@@ -448,16 +461,17 @@ export class CollectionsService {
 						bypassEmitAction: (params) =>
 							opts?.bypassEmitAction ? opts.bypassEmitAction(params) : nestedActionEvents.push(params),
 					});
+
 					collectionKeys.push(payload[collectionKey]);
 				}
 			});
 		} finally {
-			if (this.cache && env.CACHE_AUTO_PURGE && opts?.autoPurgeCache !== false) {
+			if (shouldClearCache(this.cache, opts)) {
 				await this.cache.clear();
 			}
 
 			if (opts?.autoPurgeSystemCache !== false) {
-				await clearSystemCache();
+				await clearSystemCache({ autoPurgeCache: opts?.autoPurgeCache });
 			}
 
 			if (opts?.emitEvents !== false && nestedActionEvents.length > 0) {
@@ -502,12 +516,12 @@ export class CollectionsService {
 
 			return collectionKeys;
 		} finally {
-			if (this.cache && env.CACHE_AUTO_PURGE && opts?.autoPurgeCache !== false) {
+			if (shouldClearCache(this.cache, opts)) {
 				await this.cache.clear();
 			}
 
 			if (opts?.autoPurgeSystemCache !== false) {
-				await clearSystemCache();
+				await clearSystemCache({ autoPurgeCache: opts?.autoPurgeCache });
 			}
 
 			if (opts?.emitEvents !== false && nestedActionEvents.length > 0) {
@@ -578,8 +592,14 @@ export class CollectionsService {
 						.where({ collection: collectionKey });
 
 					if (revisionsToDelete.length > 0) {
-						const keys = revisionsToDelete.map((record) => record.id);
-						await trx('directus_revisions').update({ parent: null }).whereIn('parent', keys);
+						const chunks = chunk(
+							revisionsToDelete.map((record) => record.id),
+							10000
+						);
+
+						for (const keys of chunks) {
+							await trx('directus_revisions').update({ parent: null }).whereIn('parent', keys);
+						}
 					}
 
 					await trx('directus_revisions').delete().where('collection', '=', collectionKey);
@@ -622,6 +642,7 @@ export class CollectionsService {
 						const newAllowedCollections = relation
 							.meta!.one_allowed_collections!.filter((collection) => collectionKey !== collection)
 							.join(',');
+
 						await trx('directus_relations')
 							.update({ one_allowed_collections: newAllowedCollections })
 							.where({ id: relation.meta!.id });
@@ -631,12 +652,12 @@ export class CollectionsService {
 
 			return collectionKey;
 		} finally {
-			if (this.cache && env.CACHE_AUTO_PURGE && opts?.autoPurgeCache !== false) {
+			if (shouldClearCache(this.cache, opts)) {
 				await this.cache.clear();
 			}
 
 			if (opts?.autoPurgeSystemCache !== false) {
-				await clearSystemCache();
+				await clearSystemCache({ autoPurgeCache: opts?.autoPurgeCache });
 			}
 
 			if (opts?.emitEvents !== false && nestedActionEvents.length > 0) {
@@ -679,12 +700,12 @@ export class CollectionsService {
 
 			return collectionKeys;
 		} finally {
-			if (this.cache && env.CACHE_AUTO_PURGE && opts?.autoPurgeCache !== false) {
+			if (shouldClearCache(this.cache, opts)) {
 				await this.cache.clear();
 			}
 
 			if (opts?.autoPurgeSystemCache !== false) {
-				await clearSystemCache();
+				await clearSystemCache({ autoPurgeCache: opts?.autoPurgeCache });
 			}
 
 			if (opts?.emitEvents !== false && nestedActionEvents.length > 0) {

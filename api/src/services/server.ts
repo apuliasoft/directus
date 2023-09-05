@@ -1,23 +1,21 @@
-import { Knex } from 'knex';
-import { merge } from 'lodash';
-import os from 'os';
-import { performance } from 'perf_hooks';
-// @ts-ignore
-import { version } from '../../package.json';
-import { getCache } from '../cache';
-import getDatabase, { hasDatabaseConnection } from '../database';
-import env from '../env';
-import logger from '../logger';
-import { rateLimiter } from '../middleware/rate-limiter-ip';
-import { getStorage } from '../storage';
-import { AbstractServiceOptions } from '../types';
-import { Accountability, SchemaOverview } from '@directus/shared/types';
-import { toArray } from '@directus/shared/utils';
-import getMailer from '../mailer';
-import { SettingsService } from './settings';
-import { getOSInfo } from '../utils/get-os-info';
+import type { Accountability, SchemaOverview } from '@directus/types';
+import { toArray } from '@directus/utils';
+import type { Knex } from 'knex';
+import { merge } from 'lodash-es';
 import { Readable } from 'node:stream';
-import { rateLimiterGlobal } from '../middleware/rate-limiter-global';
+import { performance } from 'perf_hooks';
+import { getCache } from '../cache.js';
+import getDatabase, { hasDatabaseConnection } from '../database/index.js';
+import env from '../env.js';
+import logger from '../logger.js';
+import getMailer from '../mailer.js';
+import { rateLimiterGlobal } from '../middleware/rate-limiter-global.js';
+import { rateLimiter } from '../middleware/rate-limiter-ip.js';
+import { SERVER_ONLINE } from '../server.js';
+import { getStorage } from '../storage/index.js';
+import type { AbstractServiceOptions } from '../types/index.js';
+import { version } from '../utils/package.js';
+import { SettingsService } from './settings.js';
 
 export class ServerService {
 	knex: Knex;
@@ -49,48 +47,34 @@ export class ServerService {
 			],
 		});
 
-		info.project = projectInfo;
+		info['project'] = projectInfo;
 
 		if (this.accountability?.user) {
-			if (env.RATE_LIMITER_ENABLED) {
-				info.rateLimit = {
-					points: env.RATE_LIMITER_POINTS,
-					duration: env.RATE_LIMITER_DURATION,
+			if (env['RATE_LIMITER_ENABLED']) {
+				info['rateLimit'] = {
+					points: env['RATE_LIMITER_POINTS'],
+					duration: env['RATE_LIMITER_DURATION'],
 				};
 			} else {
-				info.rateLimit = false;
+				info['rateLimit'] = false;
 			}
-			if (env.RATE_LIMITER_GLOBAL_ENABLED) {
-				info.rateLimitGlobal = {
-					points: env.RATE_LIMITER_GLOBAL_POINTS,
-					duration: env.RATE_LIMITER_GLOBAL_DURATION,
+
+			if (env['RATE_LIMITER_GLOBAL_ENABLED']) {
+				info['rateLimitGlobal'] = {
+					points: env['RATE_LIMITER_GLOBAL_POINTS'],
+					duration: env['RATE_LIMITER_GLOBAL_DURATION'],
 				};
 			} else {
-				info.rateLimitGlobal = false;
+				info['rateLimitGlobal'] = false;
 			}
 
-			info.flows = {
-				execAllowedModules: env.FLOWS_EXEC_ALLOWED_MODULES ? toArray(env.FLOWS_EXEC_ALLOWED_MODULES) : [],
-			};
-		}
-
-		if (this.accountability?.admin === true) {
-			const { osType, osVersion } = getOSInfo();
-
-			info.directus = {
-				version,
+			info['flows'] = {
+				execAllowedModules: env['FLOWS_EXEC_ALLOWED_MODULES'] ? toArray(env['FLOWS_EXEC_ALLOWED_MODULES']) : [],
 			};
 
-			info.node = {
-				version: process.versions.node,
-				uptime: Math.round(process.uptime()),
-			};
-
-			info.os = {
-				type: osType,
-				version: osVersion,
-				uptime: Math.round(os.uptime()),
-				totalmem: os.totalmem(),
+			info['queryLimit'] = {
+				default: env['QUERY_LIMIT_DEFAULT'],
+				max: Number.isFinite(env['QUERY_LIMIT_MAX']) ? env['QUERY_LIMIT_MAX'] : -1,
 			};
 		}
 
@@ -124,7 +108,7 @@ export class ServerService {
 		const data: HealthData = {
 			status: 'ok',
 			releaseId: version,
-			serviceId: env.KEY,
+			serviceId: env['KEY'],
 			checks: merge(
 				...(await Promise.all([
 					testDatabase(),
@@ -137,12 +121,17 @@ export class ServerService {
 			),
 		};
 
+		if (SERVER_ONLINE === false) {
+			data.status = 'error';
+		}
+
 		for (const [service, healthData] of Object.entries(data.checks)) {
 			for (const healthCheck of healthData) {
 				if (healthCheck.status === 'warn' && data.status === 'ok') {
 					logger.warn(
 						`${service} in WARN state, the observed value ${healthCheck.observedValue} is above the threshold of ${healthCheck.threshold}${healthCheck.observedUnit}`
 					);
+
 					data.status = 'warn';
 					continue;
 				}
@@ -166,7 +155,7 @@ export class ServerService {
 
 		async function testDatabase(): Promise<Record<string, HealthCheck[]>> {
 			const database = getDatabase();
-			const client = env.DB_CLIENT;
+			const client = env['DB_CLIENT'];
 
 			const checks: Record<string, HealthCheck[]> = {};
 
@@ -178,27 +167,28 @@ export class ServerService {
 					componentType: 'datastore',
 					observedUnit: 'ms',
 					observedValue: 0,
-					threshold: env.DB_HEALTHCHECK_THRESHOLD ? +env.DB_HEALTHCHECK_THRESHOLD : 150,
+					threshold: env['DB_HEALTHCHECK_THRESHOLD'] ? +env['DB_HEALTHCHECK_THRESHOLD'] : 150,
 				},
 			];
 
 			const startTime = performance.now();
 
 			if (await hasDatabaseConnection()) {
-				checks[`${client}:responseTime`][0].status = 'ok';
+				checks[`${client}:responseTime`]![0]!.status = 'ok';
 			} else {
-				checks[`${client}:responseTime`][0].status = 'error';
-				checks[`${client}:responseTime`][0].output = `Can't connect to the database.`;
+				checks[`${client}:responseTime`]![0]!.status = 'error';
+				checks[`${client}:responseTime`]![0]!.output = `Can't connect to the database.`;
 			}
 
 			const endTime = performance.now();
-			checks[`${client}:responseTime`][0].observedValue = +(endTime - startTime).toFixed(3);
+			checks[`${client}:responseTime`]![0]!.observedValue = +(endTime - startTime).toFixed(3);
 
 			if (
-				checks[`${client}:responseTime`][0].observedValue! > checks[`${client}:responseTime`][0].threshold! &&
-				checks[`${client}:responseTime`][0].status !== 'error'
+				Number(checks[`${client}:responseTime`]![0]!.observedValue!) >
+					checks[`${client}:responseTime`]![0]!.threshold! &&
+				checks[`${client}:responseTime`]![0]!.status !== 'error'
 			) {
-				checks[`${client}:responseTime`][0].status = 'warn';
+				checks[`${client}:responseTime`]![0]!.status = 'warn';
 			}
 
 			checks[`${client}:connectionsAvailable`] = [
@@ -221,7 +211,7 @@ export class ServerService {
 		}
 
 		async function testCache(): Promise<Record<string, HealthCheck[]>> {
-			if (env.CACHE_ENABLED !== true) {
+			if (env['CACHE_ENABLED'] !== true) {
 				return {};
 			}
 
@@ -234,7 +224,7 @@ export class ServerService {
 						componentType: 'cache',
 						observedValue: 0,
 						observedUnit: 'ms',
-						threshold: env.CACHE_HEALTHCHECK_THRESHOLD ? +env.CACHE_HEALTHCHECK_THRESHOLD : 150,
+						threshold: env['CACHE_HEALTHCHECK_THRESHOLD'] ? +env['CACHE_HEALTHCHECK_THRESHOLD'] : 150,
 					},
 				],
 			};
@@ -245,17 +235,17 @@ export class ServerService {
 				await cache!.set(`health-${checkID}`, true, 5);
 				await cache!.delete(`health-${checkID}`);
 			} catch (err: any) {
-				checks['cache:responseTime'][0].status = 'error';
-				checks['cache:responseTime'][0].output = err;
+				checks['cache:responseTime']![0]!.status = 'error';
+				checks['cache:responseTime']![0]!.output = err;
 			} finally {
 				const endTime = performance.now();
-				checks['cache:responseTime'][0].observedValue = +(endTime - startTime).toFixed(3);
+				checks['cache:responseTime']![0]!.observedValue = +(endTime - startTime).toFixed(3);
 
 				if (
-					checks['cache:responseTime'][0].observedValue > checks['cache:responseTime'][0].threshold! &&
-					checks['cache:responseTime'][0].status !== 'error'
+					checks['cache:responseTime']![0]!.observedValue > checks['cache:responseTime']![0]!.threshold! &&
+					checks['cache:responseTime']![0]!.status !== 'error'
 				) {
-					checks['cache:responseTime'][0].status = 'warn';
+					checks['cache:responseTime']![0]!.status = 'warn';
 				}
 			}
 
@@ -263,7 +253,7 @@ export class ServerService {
 		}
 
 		async function testRateLimiter(): Promise<Record<string, HealthCheck[]>> {
-			if (env.RATE_LIMITER_ENABLED !== true) {
+			if (env['RATE_LIMITER_ENABLED'] !== true) {
 				return {};
 			}
 
@@ -274,7 +264,7 @@ export class ServerService {
 						componentType: 'ratelimiter',
 						observedValue: 0,
 						observedUnit: 'ms',
-						threshold: env.RATE_LIMITER_HEALTHCHECK_THRESHOLD ? +env.RATE_LIMITER_HEALTHCHECK_THRESHOLD : 150,
+						threshold: env['RATE_LIMITER_HEALTHCHECK_THRESHOLD'] ? +env['RATE_LIMITER_HEALTHCHECK_THRESHOLD'] : 150,
 					},
 				],
 			};
@@ -285,17 +275,17 @@ export class ServerService {
 				await rateLimiter.consume(`health-${checkID}`, 1);
 				await rateLimiter.delete(`health-${checkID}`);
 			} catch (err: any) {
-				checks['rateLimiter:responseTime'][0].status = 'error';
-				checks['rateLimiter:responseTime'][0].output = err;
+				checks['rateLimiter:responseTime']![0]!.status = 'error';
+				checks['rateLimiter:responseTime']![0]!.output = err;
 			} finally {
 				const endTime = performance.now();
-				checks['rateLimiter:responseTime'][0].observedValue = +(endTime - startTime).toFixed(3);
+				checks['rateLimiter:responseTime']![0]!.observedValue = +(endTime - startTime).toFixed(3);
 
 				if (
-					checks['rateLimiter:responseTime'][0].observedValue > checks['rateLimiter:responseTime'][0].threshold! &&
-					checks['rateLimiter:responseTime'][0].status !== 'error'
+					checks['rateLimiter:responseTime']![0]!.observedValue > checks['rateLimiter:responseTime']![0]!.threshold! &&
+					checks['rateLimiter:responseTime']![0]!.status !== 'error'
 				) {
-					checks['rateLimiter:responseTime'][0].status = 'warn';
+					checks['rateLimiter:responseTime']![0]!.status = 'warn';
 				}
 			}
 
@@ -303,7 +293,7 @@ export class ServerService {
 		}
 
 		async function testRateLimiterGlobal(): Promise<Record<string, HealthCheck[]>> {
-			if (env.RATE_LIMITER_GLOBAL_ENABLED !== true) {
+			if (env['RATE_LIMITER_GLOBAL_ENABLED'] !== true) {
 				return {};
 			}
 
@@ -314,8 +304,8 @@ export class ServerService {
 						componentType: 'ratelimiter',
 						observedValue: 0,
 						observedUnit: 'ms',
-						threshold: env.RATE_LIMITER_GLOBAL_HEALTHCHECK_THRESHOLD
-							? +env.RATE_LIMITER_GLOBAL_HEALTHCHECK_THRESHOLD
+						threshold: env['RATE_LIMITER_GLOBAL_HEALTHCHECK_THRESHOLD']
+							? +env['RATE_LIMITER_GLOBAL_HEALTHCHECK_THRESHOLD']
 							: 150,
 					},
 				],
@@ -327,18 +317,18 @@ export class ServerService {
 				await rateLimiterGlobal.consume(`health-${checkID}`, 1);
 				await rateLimiterGlobal.delete(`health-${checkID}`);
 			} catch (err: any) {
-				checks['rateLimiterGlobal:responseTime'][0].status = 'error';
-				checks['rateLimiterGlobal:responseTime'][0].output = err;
+				checks['rateLimiterGlobal:responseTime']![0]!.status = 'error';
+				checks['rateLimiterGlobal:responseTime']![0]!.output = err;
 			} finally {
 				const endTime = performance.now();
-				checks['rateLimiterGlobal:responseTime'][0].observedValue = +(endTime - startTime).toFixed(3);
+				checks['rateLimiterGlobal:responseTime']![0]!.observedValue = +(endTime - startTime).toFixed(3);
 
 				if (
-					checks['rateLimiterGlobal:responseTime'][0].observedValue >
-						checks['rateLimiterGlobal:responseTime'][0].threshold! &&
-					checks['rateLimiterGlobal:responseTime'][0].status !== 'error'
+					checks['rateLimiterGlobal:responseTime']![0]!.observedValue >
+						checks['rateLimiterGlobal:responseTime']![0]!.threshold! &&
+					checks['rateLimiterGlobal:responseTime']![0]!.status !== 'error'
 				) {
-					checks['rateLimiterGlobal:responseTime'][0].status = 'warn';
+					checks['rateLimiterGlobal:responseTime']![0]!.status = 'warn';
 				}
 			}
 
@@ -350,9 +340,10 @@ export class ServerService {
 
 			const checks: Record<string, HealthCheck[]> = {};
 
-			for (const location of toArray(env.STORAGE_LOCATIONS)) {
+			for (const location of toArray(env['STORAGE_LOCATIONS'])) {
 				const disk = storage.location(location);
 				const envThresholdKey = `STORAGE_${location}_HEALTHCHECK_THRESHOLD`.toUpperCase();
+
 				checks[`storage:${location}:responseTime`] = [
 					{
 						status: 'ok',
@@ -368,23 +359,24 @@ export class ServerService {
 				try {
 					await disk.write(`health-${checkID}`, Readable.from(['check']));
 					const fileStream = await disk.read(`health-${checkID}`);
+
 					fileStream.on('data', async () => {
 						fileStream.destroy();
 						await disk.delete(`health-${checkID}`);
 					});
 				} catch (err: any) {
-					checks[`storage:${location}:responseTime`][0].status = 'error';
-					checks[`storage:${location}:responseTime`][0].output = err;
+					checks[`storage:${location}:responseTime`]![0]!.status = 'error';
+					checks[`storage:${location}:responseTime`]![0]!.output = err;
 				} finally {
 					const endTime = performance.now();
-					checks[`storage:${location}:responseTime`][0].observedValue = +(endTime - startTime).toFixed(3);
+					checks[`storage:${location}:responseTime`]![0]!.observedValue = +(endTime - startTime).toFixed(3);
 
 					if (
-						checks[`storage:${location}:responseTime`][0].observedValue! >
-							checks[`storage:${location}:responseTime`][0].threshold! &&
-						checks[`storage:${location}:responseTime`][0].status !== 'error'
+						Number(checks[`storage:${location}:responseTime`]![0]!.observedValue!) >
+							checks[`storage:${location}:responseTime`]![0]!.threshold! &&
+						checks[`storage:${location}:responseTime`]![0]!.status !== 'error'
 					) {
-						checks[`storage:${location}:responseTime`][0].status = 'warn';
+						checks[`storage:${location}:responseTime`]![0]!.status = 'warn';
 					}
 				}
 			}
@@ -407,8 +399,8 @@ export class ServerService {
 			try {
 				await mailer.verify();
 			} catch (err: any) {
-				checks['email:connection'][0].status = 'error';
-				checks['email:connection'][0].output = err;
+				checks['email:connection']![0]!.status = 'error';
+				checks['email:connection']![0]!.output = err;
 			}
 
 			return checks;

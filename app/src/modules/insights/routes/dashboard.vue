@@ -80,7 +80,7 @@
 		</template>
 
 		<template #sidebar>
-			<sidebar-detail icon="info_outline" :title="t('information')" close>
+			<sidebar-detail icon="info" :title="t('information')" close>
 				<div v-md="t('page_help_insights_dashboard')" class="page-description" />
 			</sidebar-detail>
 
@@ -121,18 +121,27 @@
 					>
 						{{ t('no_data') }}
 					</div>
-					<component
-						:is="`panel-${tile.data.type}`"
-						v-else
-						v-bind="tile.data.options"
-						:id="tile.id"
-						:dashboard="primaryKey"
-						:show-header="tile.showHeader"
-						:height="tile.height"
-						:width="tile.width"
-						:now="now"
-						:data="data[tile.id]"
-					/>
+					<v-error-boundary v-else :name="`panel-${tile.data.type}`">
+						<component
+							:is="`panel-${tile.data.type}`"
+							v-bind="tile.data.options"
+							:id="tile.id"
+							:dashboard="primaryKey"
+							:show-header="tile.showHeader"
+							:height="tile.height"
+							:width="tile.width"
+							:now="now"
+							:data="data[tile.id]"
+						/>
+
+						<template #fallback="{ error }">
+							<div class="panel-error">
+								<v-icon name="warning" />
+								{{ t('unexpected_error') }}
+								<v-error :error="error" />
+							</div>
+						</template>
+					</v-error-boundary>
 				</div>
 			</template>
 		</v-workspace>
@@ -190,7 +199,7 @@
 	</private-view>
 </template>
 
-<script lang="ts" setup>
+<script setup lang="ts">
 import { AppTile } from '@/components/v-workspace-tile.vue';
 import { useEditsGuard } from '@/composables/use-edits-guard';
 import { useShortcut } from '@/composables/use-shortcut';
@@ -201,7 +210,7 @@ import { useInsightsStore } from '@/stores/insights';
 import { usePermissionsStore } from '@/stores/permissions';
 import { pointOnLine } from '@/utils/point-on-line';
 import RefreshSidebarDetail from '@/views/private/components/refresh-sidebar-detail.vue';
-import { applyOptionsData } from '@directus/shared/utils';
+import { applyOptionsData } from '@directus/utils';
 import { assign, isEmpty } from 'lodash';
 import { computed, ref, toRefs, unref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -266,14 +275,21 @@ const tiles = computed<AppTile[]>(() => {
 					[otherPanel.coordinates[3], otherPanel.coordinates[0]],
 				];
 
-				if (topLeftIntersects === false)
+				if (topLeftIntersects === false) {
 					topLeftIntersects = borders.some(([p1, p2]) => pointOnLine(panel.coordinates[0], p1, p2));
-				if (topRightIntersects === false)
+				}
+
+				if (topRightIntersects === false) {
 					topRightIntersects = borders.some(([p1, p2]) => pointOnLine(panel.coordinates[1], p1, p2));
-				if (bottomRightIntersects === false)
+				}
+
+				if (bottomRightIntersects === false) {
 					bottomRightIntersects = borders.some(([p1, p2]) => pointOnLine(panel.coordinates[2], p1, p2));
-				if (bottomLeftIntersects === false)
+				}
+
+				if (bottomLeftIntersects === false) {
 					bottomLeftIntersects = borders.some(([p1, p2]) => pointOnLine(panel.coordinates[3], p1, p2));
+				}
 			}
 
 			const panelType = unref(panelsInfo).find((panelType) => panelType.id === panel.type);
@@ -328,6 +344,7 @@ const cancelChanges = (force = false) => {
 
 const copyPanelTo = ref(insightsStore.dashboards.find((dashboard) => dashboard.id !== props.primaryKey)?.id);
 const copyPanelID = ref<string | null>();
+
 const copyPanel = () => {
 	insightsStore.stagePanelDuplicate(unref(copyPanelID)!, { dashboard: unref(copyPanelTo) });
 	copyPanelID.value = null;
@@ -370,7 +387,7 @@ const toggleZoomToFit = () => (zoomToFit.value = !zoomToFit.value);
 
 const refreshInterval = computed({
 	get() {
-		return unref(refreshIntervals)[props.primaryKey];
+		return unref(refreshIntervals)[props.primaryKey] ?? null;
 	},
 	set(val) {
 		refreshIntervals.value = assign({}, unref(refreshIntervals), { [props.primaryKey]: val });

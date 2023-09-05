@@ -25,80 +25,65 @@
 	</v-list>
 </template>
 
-<script lang="ts">
+<script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { defineComponent, computed } from 'vue';
-import { version } from '../../../../package.json';
-import { useProjectInfo } from '../composables/use-project-info';
 
-export default defineComponent({
-	setup() {
-		const { t } = useI18n();
+const version = __DIRECTUS_VERSION__;
 
-		const { parsedInfo } = useProjectInfo();
+const { t } = useI18n();
 
-		const navItems = [
-			{
-				icon: 'public',
-				name: t('settings_project'),
-				to: `/settings/project`,
-			},
-			{
-				icon: 'list_alt',
-				name: t('settings_data_model'),
-				to: `/settings/data-model`,
-			},
-			{
-				icon: 'admin_panel_settings',
-				name: t('settings_permissions'),
-				to: `/settings/roles`,
-			},
-			{
-				icon: 'bookmark_border',
-				name: t('settings_presets'),
-				to: `/settings/presets`,
-			},
-			{
-				icon: 'translate',
-				name: t('settings_translation_strings'),
-				to: `/settings/translation-strings`,
-			},
-			{
-				icon: 'anchor',
-				name: t('settings_webhooks'),
-				to: `/settings/webhooks`,
-			},
-			{
-				icon: 'bolt',
-				name: t('settings_flows'),
-				to: `/settings/flows`,
-			},
-		];
-
-		const externalItems = computed(() => {
-			const bugReportParams = new URLSearchParams({
-				template: 'bug_report.yml',
-				'directus-version': parsedInfo.value?.directus.version ?? '',
-				'node-version': parsedInfo.value?.node.version ?? '',
-				'operating-system': `${parsedInfo.value?.os.type ?? ''} ${parsedInfo.value?.os.version ?? ''}`,
-			});
-
-			return [
-				{
-					icon: 'bug_report',
-					name: t('report_bug'),
-					href: `https://github.com/directus/directus/issues/new?${bugReportParams.toString()}`,
-				},
-				{
-					icon: 'new_releases',
-					name: t('request_feature'),
-					href: 'https://github.com/directus/directus/discussions/new',
-				},
-			];
-		});
-
-		return { version, navItems, externalItems };
+const navItems = [
+	{
+		icon: 'public',
+		name: t('settings_project'),
+		to: `/settings/project`,
 	},
+	{
+		icon: 'list_alt',
+		name: t('settings_data_model'),
+		to: `/settings/data-model`,
+	},
+	{
+		icon: 'admin_panel_settings',
+		name: t('settings_permissions'),
+		to: `/settings/roles`,
+	},
+	{
+		icon: 'bookmark',
+		name: t('settings_presets'),
+		to: `/settings/presets`,
+	},
+	{
+		icon: 'translate',
+		name: t('settings_translations'),
+		to: `/settings/translations`,
+	},
+	{
+		icon: 'anchor',
+		name: t('settings_webhooks'),
+		to: `/settings/webhooks`,
+	},
+	{
+		icon: 'bolt',
+		name: t('settings_flows'),
+		to: `/settings/flows`,
+	},
+];
+
+const externalItems = computed(() => {
+	return [
+		{
+			icon: 'bug_report',
+			name: t('report_bug'),
+			href: 'https://github.com/directus/directus/issues/new',
+		},
+		{
+			icon: 'new_releases',
+			name: t('request_feature'),
+			href: 'https://github.com/directus/directus/discussions/new',
+		},
+	];
 });
 </script>
 

@@ -29,6 +29,51 @@
 					</template>
 				</v-list-item>
 
+				<template v-if="collection.type === 'alias' || hasNestedCollections">
+					<v-divider />
+
+					<v-list-item
+						:active="collection.meta?.collapse === 'open'"
+						clickable
+						@click="update({ meta: { collapse: 'open' } })"
+					>
+						<v-list-item-icon>
+							<v-icon name="folder_open" />
+						</v-list-item-icon>
+						<v-list-item-content>
+							{{ t('start_open') }}
+						</v-list-item-content>
+					</v-list-item>
+
+					<v-list-item
+						:active="collection.meta?.collapse === 'closed'"
+						clickable
+						@click="update({ meta: { collapse: 'closed' } })"
+					>
+						<v-list-item-icon>
+							<v-icon name="folder" />
+						</v-list-item-icon>
+						<v-list-item-content>
+							{{ t('start_collapsed') }}
+						</v-list-item-content>
+					</v-list-item>
+
+					<v-list-item
+						:active="collection.meta?.collapse === 'locked'"
+						clickable
+						@click="update({ meta: { collapse: 'locked' } })"
+					>
+						<v-list-item-icon>
+							<v-icon name="folder_lock" />
+						</v-list-item-icon>
+						<v-list-item-content>
+							{{ t('always_open') }}
+						</v-list-item-content>
+					</v-list-item>
+
+					<v-divider />
+				</template>
+
 				<v-list-item clickable class="danger" @click="deleteActive = true">
 					<v-list-item-icon>
 						<v-icon name="delete" />
@@ -40,7 +85,7 @@
 			</v-list>
 		</v-menu>
 
-		<v-dialog v-model="deleteActive" @esc="deleteActive = null">
+		<v-dialog v-model="deleteActive" @esc="deleteActive = false">
 			<v-card>
 				<v-card-title>
 					{{
@@ -49,8 +94,20 @@
 							: t('delete_folder_are_you_sure', { folder: collection.collection })
 					}}
 				</v-card-title>
+				<v-card-text v-if="peerDependencies.length > 0">
+					<v-notice type="danger">
+						<div class="delete-dependencies">
+							{{ t('delete_collection_peer_dependencies') }}
+							<ul>
+								<li v-for="dependency in peerDependencies" :key="dependency.collection">
+									{{ dependency.field }} ({{ dependency.collection }})
+								</li>
+							</ul>
+						</div>
+					</v-notice>
+				</v-card-text>
 				<v-card-actions>
-					<v-button :disabled="deleting" secondary @click="deleteActive = null">
+					<v-button :disabled="deleting" secondary @click="deleteActive = false">
 						{{ t('cancel') }}
 					</v-button>
 					<v-button :loading="deleting" kind="danger" @click="deleteCollection">
@@ -62,50 +119,70 @@
 	</div>
 </template>
 
-<script lang="ts">
-import { useI18n } from 'vue-i18n';
-import { defineComponent, PropType, ref } from 'vue';
-import { Collection } from '@/types/collections';
+<script setup lang="ts">
 import { useCollectionsStore } from '@/stores/collections';
+import { useFieldsStore } from '@/stores/fields';
+import { useRelationsStore } from '@/stores/relations';
+import { Collection } from '@/types/collections';
+import type { DeepPartial } from '@directus/types';
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
-export default defineComponent({
-	props: {
-		collection: {
-			type: Object as PropType<Collection>,
-			required: true,
-		},
-	},
-	setup(props) {
-		const { t } = useI18n();
+type Props = {
+	collection: Collection;
+	hasNestedCollections: boolean;
+};
 
-		const collectionsStore = useCollectionsStore();
-		const { deleting, deleteActive, deleteCollection } = useDelete();
+const props = withDefaults(defineProps<Props>(), {});
 
-		return { t, deleting, deleteActive, deleteCollection, update };
+const { t } = useI18n();
 
-		async function update(updates: Partial<Collection>) {
-			await collectionsStore.updateCollection(props.collection.collection, updates);
-		}
+const collectionsStore = useCollectionsStore();
+const fieldsStore = useFieldsStore();
+const relationsStore = useRelationsStore();
+const { deleting, deleteActive, deleteCollection } = useDelete();
 
-		function useDelete() {
-			const deleting = ref(false);
-			const deleteActive = ref(false);
-
-			return { deleting, deleteActive, deleteCollection };
-
-			async function deleteCollection() {
-				deleting.value = true;
-
-				try {
-					await collectionsStore.deleteCollection(props.collection.collection);
-					deleteActive.value = false;
-				} finally {
-					deleting.value = false;
-				}
-			}
-		}
-	},
+const peerDependencies = computed(() => {
+	return relationsStore.relations
+		.filter((relation) => {
+			// a2o relations are ignored on purpose, to be able to select other collections afterwards
+			return (
+				relation.meta?.one_collection === props.collection.collection &&
+				relation.meta?.many_collection &&
+				relation.meta?.many_field
+			);
+		})
+		.map((relation) => ({
+			collection: relation.meta?.many_collection,
+			field: relation.meta?.many_field,
+		}));
 });
+
+function useDelete() {
+	const deleting = ref(false);
+	const deleteActive = ref(false);
+
+	return { deleting, deleteActive, deleteCollection };
+
+	async function deleteCollection() {
+		deleting.value = true;
+
+		try {
+			for (const dependency of peerDependencies.value) {
+				await fieldsStore.deleteField(dependency.collection!, dependency.field!);
+			}
+
+			await collectionsStore.deleteCollection(props.collection.collection);
+			deleteActive.value = false;
+		} finally {
+			deleting.value = false;
+		}
+	}
+}
+
+async function update(updates: DeepPartial<Collection>) {
+	await collectionsStore.updateCollection(props.collection.collection, updates);
+}
 </script>
 
 <style lang="scss" scoped>
@@ -127,5 +204,10 @@ export default defineComponent({
 	--v-list-item-color: var(--warning);
 	--v-list-item-color-hover: var(--warning);
 	--v-list-item-icon-color: var(--warning);
+}
+
+.delete-dependencies {
+	display: flex;
+	flex-direction: column;
 }
 </style>

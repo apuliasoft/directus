@@ -1,13 +1,14 @@
-import { defineModule } from '@directus/shared/utils';
+import { defineModule } from '@directus/utils';
 import { addQueryToPath } from '@/utils/add-query-to-path';
 import RouterPass from '@/utils/router-passthrough';
 import { LocationQuery, NavigationGuard } from 'vue-router';
 import CollectionOrItem from './routes/collection-or-item.vue';
 import Item from './routes/item.vue';
+import Preview from './routes/preview.vue';
 import ItemNotFound from './routes/not-found.vue';
 import NoCollections from './routes/no-collections.vue';
 import { useCollectionsStore } from '@/stores/collections';
-import { Collection } from '@directus/shared/types';
+import { Collection } from '@directus/types';
 import { orderBy, isNil } from 'lodash';
 import { useNavigation } from './composables/use-navigation';
 import { useLocalStorage } from '@/composables/use-local-storage';
@@ -56,6 +57,14 @@ const checkForSystem: NavigationGuard = (to, from) => {
 		}
 	}
 
+	if (to.params.collection === 'directus_translations') {
+		if (to.params.primaryKey) {
+			return `/settings/translations/${to.params.primaryKey}`;
+		} else {
+			return '/settings/translations';
+		}
+	}
+
 	if (
 		'bookmark' in from.query &&
 		typeof from.query.bookmark === 'string' &&
@@ -99,6 +108,7 @@ export default defineModule({
 				);
 
 				const { data } = useLocalStorage('last-accessed-collection');
+
 				if (
 					data.value &&
 					collectionsStore.visibleCollections.find((visibleCollection) => visibleCollection.collection === data.value)
@@ -164,6 +174,12 @@ export default defineModule({
 					beforeEnter: checkForSystem,
 				},
 			],
+		},
+		{
+			name: 'content-item-preview',
+			path: ':collection/:primaryKey/preview',
+			component: Preview,
+			props: true,
 		},
 		{
 			name: 'content-item-not-found',

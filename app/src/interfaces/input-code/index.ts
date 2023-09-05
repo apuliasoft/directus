@@ -1,5 +1,5 @@
-import { DeepPartial, Field } from '@directus/shared/types';
-import { defineInterface } from '@directus/shared/utils';
+import { DeepPartial, Field } from '@directus/types';
+import { defineInterface } from '@directus/utils';
 import CodeMirror from 'codemirror';
 import 'codemirror/mode/meta';
 import InterfaceCode from './input-code.vue';
@@ -74,9 +74,6 @@ export default defineInterface({
 					options: {
 						placeholder: '$t:interfaces.input-code.placeholder',
 					},
-				},
-				schema: {
-					default_value: null,
 				},
 			},
 		];

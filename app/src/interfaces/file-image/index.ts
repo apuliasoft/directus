@@ -1,4 +1,4 @@
-import { defineInterface } from '@directus/shared/utils';
+import { defineInterface } from '@directus/utils';
 import InterfaceFileImage from './file-image.vue';
 import PreviewSVG from './preview.svg?raw';
 
@@ -21,9 +21,6 @@ export default defineInterface({
 				width: 'half',
 				interface: 'system-folder',
 				note: '$t:interfaces.system-folder.field_hint',
-			},
-			schema: {
-				default_value: undefined,
 			},
 		},
 		{

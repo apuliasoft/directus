@@ -11,7 +11,11 @@
 		show-select="none"
 		collection="directus_activity"
 	>
-		<private-view :title="t('activity_feed')">
+		<private-view
+			:title="t('activity_feed')"
+			:small-header="currentLayout?.smallHeader"
+			:header-shadow="currentLayout?.headerShadow"
+		>
 			<template #title-outer:prepend>
 				<v-button class="header-icon" rounded disabled icon secondary>
 					<v-icon name="access_time" />
@@ -30,7 +34,7 @@
 				<activity-navigation v-model:filter="roleFilter" />
 			</template>
 
-			<component :is="`layout-${layout}`" v-bind="layoutState" class="layout">
+			<component :is="`layout-${layout}`" v-bind="layoutState">
 				<template #no-results>
 					<v-info :title="t('no_results')" icon="search" center>
 						{{ t('no_results_copy') }}
@@ -47,7 +51,7 @@
 			<router-view name="detail" :primary-key="primaryKey" />
 
 			<template #sidebar>
-				<sidebar-detail icon="info_outline" :title="t('information')" close>
+				<sidebar-detail icon="info" :title="t('information')" close>
 					<div v-md="t('page_help_activity_collection')" class="page-description" />
 				</sidebar-detail>
 				<layout-sidebar-detail v-model="layout">
@@ -59,63 +63,31 @@
 	</component>
 </template>
 
-<script lang="ts">
-import { useI18n } from 'vue-i18n';
-import { defineComponent, computed, ref } from 'vue';
-import ActivityNavigation from '../components/navigation.vue';
+<script setup lang="ts">
+import { useExtension } from '@/composables/use-extension';
 import { usePreset } from '@/composables/use-preset';
-import { useLayout } from '@directus/shared/composables';
 import LayoutSidebarDetail from '@/views/private/components/layout-sidebar-detail.vue';
 import SearchInput from '@/views/private/components/search-input.vue';
-import { Filter } from '@directus/shared/types';
-import { mergeFilters } from '@directus/shared/utils';
+import { useLayout } from '@directus/composables';
+import { Filter } from '@directus/types';
+import { mergeFilters } from '@directus/utils';
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import ActivityNavigation from '../components/navigation.vue';
 
-export default defineComponent({
-	name: 'ActivityCollection',
-	components: { ActivityNavigation, LayoutSidebarDetail, SearchInput },
-	props: {
-		primaryKey: {
-			type: String,
-			default: null,
-		},
-	},
-	setup() {
-		const { t } = useI18n();
+defineProps<{
+	primaryKey?: string;
+}>();
 
-		const { layout, layoutOptions, layoutQuery, filter, search } = usePreset(ref('directus_activity'));
-		const { breadcrumb } = useBreadcrumb();
+const { t } = useI18n();
 
-		const { layoutWrapper } = useLayout(layout);
+const { layout, layoutOptions, layoutQuery, filter, search } = usePreset(ref('directus_activity'));
 
-		const roleFilter = ref<Filter | null>(null);
+const { layoutWrapper } = useLayout(layout);
 
-		return {
-			t,
-			breadcrumb,
-			layout,
-			layoutWrapper,
-			layoutOptions,
-			layoutQuery,
-			search,
-			filter,
-			roleFilter,
-			mergeFilters,
-		};
+const currentLayout = useExtension('layout', layout);
 
-		function useBreadcrumb() {
-			const breadcrumb = computed(() => {
-				return [
-					{
-						name: t('collection', 2),
-						to: `/content`,
-					},
-				];
-			});
-
-			return { breadcrumb };
-		}
-	},
-});
+const roleFilter = ref<Filter | null>(null);
 </script>
 
 <style lang="scss" scoped>

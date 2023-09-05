@@ -1,7 +1,7 @@
 import { useFieldsStore } from '@/stores/fields';
 import { useRelationsStore } from '@/stores/relations';
-import { Field, Relation, Type } from '@directus/shared/types';
-import { getRelationType } from '@directus/shared/utils';
+import { Field, Relation, Type } from '@directus/types';
+import { getRelationType } from '@directus/utils';
 import { isNil } from 'lodash';
 import { Ref, ref, watch } from 'vue';
 
@@ -190,7 +190,7 @@ export function useFieldTree(
 	function extractFieldsFromGroup(node: FieldNode, nodes: FieldNode[]) {
 		if (node.group === true && node.children && node.children.length > 0) {
 			nodes.push(...node.children);
-			node.children.forEach(child => extractFieldsFromGroup(child, nodes));
+			node.children.forEach((child) => extractFieldsFromGroup(child, nodes));
 		}
 	}
 

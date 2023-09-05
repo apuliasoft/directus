@@ -1,8 +1,8 @@
 import api from '@/api';
 import { useFieldsStore } from '@/stores/fields';
 import { unexpectedError } from '@/utils/unexpected-error';
-import { Relation, DeepPartial } from '@directus/shared/types';
-import { getRelationType } from '@directus/shared/utils';
+import { Relation, DeepPartial } from '@directus/types';
+import { getRelationType } from '@directus/utils';
 import { isEqual } from 'lodash';
 import { defineStore } from 'pinia';
 
@@ -13,7 +13,7 @@ export const useRelationsStore = defineStore({
 	}),
 	actions: {
 		async hydrate() {
-			const response = await api.get(`/relations`, { params: { limit: -1 } });
+			const response = await api.get(`/relations`);
 			this.relations = response.data.data;
 		},
 		async dehydrate() {

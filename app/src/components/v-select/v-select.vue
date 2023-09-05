@@ -9,7 +9,12 @@
 		:placement="placement"
 	>
 		<template #activator="{ toggle, active }">
-			<div v-if="inline" class="inline-display" :class="{ placeholder: !displayValue, label, active }" @click="toggle">
+			<div
+				v-if="inline"
+				class="inline-display"
+				:class="{ placeholder: !displayValue, label, active, disabled }"
+				@click="toggle"
+			>
 				<slot name="preview">{{ displayValue || placeholder }}</slot>
 				<v-icon name="expand_more" :class="{ active }" />
 			</div>
@@ -129,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { useCustomSelection, useCustomSelectionMultiple } from '@directus/shared/composables';
+import { useCustomSelection, useCustomSelectionMultiple } from '@directus/composables';
 import { Placement } from '@popperjs/core';
 import { debounce, get } from 'lodash';
 import { computed, Ref, ref, toRefs, watch } from 'vue';
@@ -139,7 +144,7 @@ import SelectListItem from './select-list-item.vue';
 import { Option } from './types';
 
 type ItemsRaw = (string | any)[];
-type InputValue = string[] | string | null;
+type InputValue = string[] | string | number | null;
 
 interface Props {
 	/** The items that should be selectable */
@@ -218,9 +223,11 @@ const { t } = useI18n();
 const { internalItems, internalItemsCount, internalSearch } = useItems();
 const { displayValue } = useDisplayValue();
 const { modelValue } = toRefs(props);
+
 const { otherValue, usesOtherValue } = useCustomSelection(modelValue as Ref<string>, internalItems, (value) =>
 	emit('update:modelValue', value)
 );
+
 const { otherValues, addOtherValue, setOtherValue } = useCustomSelectionMultiple(
 	modelValue as Ref<string[]>,
 	internalItems,
@@ -228,6 +235,7 @@ const { otherValues, addOtherValue, setOtherValue } = useCustomSelectionMultiple
 );
 
 const search = ref<string | null>(null);
+
 watch(
 	search,
 	debounce((val: string | null) => {
@@ -258,6 +266,7 @@ function useItems() {
 				disabled: get(item, props.itemDisabled),
 				selectable: get(item, props.itemSelectable),
 				children: children ? children.filter(filterItem) : children,
+				hidden: internalSearch.value ? !filterItem(item) : false,
 			};
 		};
 
@@ -281,9 +290,7 @@ function useItems() {
 			}
 		};
 
-		const items = internalSearch.value ? props.items.filter(filterItem).map(parseItem) : props.items.map(parseItem);
-
-		return items;
+		return props.items.map(parseItem);
 	});
 
 	const internalItemsCount = computed<number>(() => {
@@ -292,6 +299,7 @@ function useItems() {
 				if (item?.children) {
 					acc += countItems(item.children);
 				}
+
 				return acc + 1;
 			}, 0);
 
@@ -395,7 +403,10 @@ function useDisplayValue() {
 .inline-display {
 	width: max-content;
 	padding-right: 18px;
-	cursor: pointer;
+
+	&:not(.disabled) {
+		cursor: pointer;
+	}
 }
 
 .inline-display.label {

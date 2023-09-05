@@ -114,17 +114,10 @@
 		</template>
 
 		<div class="file-item">
-			<div class="preview">
-				<file-preview
-					v-if="isBatch === false && item"
-					:src="fileSrc"
-					:mime="item.type"
-					:width="item.width"
-					:height="item.height"
-					:title="item.title"
-				/>
+			<div v-if="isBatch === false && item" class="preview">
+				<file-preview :src="fileSrc" :mime="item.type" :width="item.width" :height="item.height" :title="item.title" />
 
-				<button v-if="isBatch === false && item" class="replace-toggle" @click="replaceFileDialogActive = true">
+				<button class="replace-toggle" @click="replaceFileDialogActive = true">
 					{{ t('replace_file') }}
 				</button>
 			</div>
@@ -181,7 +174,7 @@
 	</private-view>
 </template>
 
-<script lang="ts" setup>
+<script setup lang="ts">
 import api from '@/api';
 import { useEditsGuard } from '@/composables/use-edits-guard';
 import { useItem } from '@/composables/use-item';
@@ -196,12 +189,12 @@ import FolderPicker from '@/views/private/components/folder-picker.vue';
 import ImageEditor from '@/views/private/components/image-editor.vue';
 import RevisionsDrawerDetail from '@/views/private/components/revisions-drawer-detail.vue';
 import SaveOptions from '@/views/private/components/save-options.vue';
-import { Field } from '@directus/shared/types';
+import { Field } from '@directus/types';
 import { computed, ref, toRefs, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import FileInfoSidebarDetail from '../components/file-info-sidebar-detail.vue';
-import FilesNavigation from '../components/navigation.vue';
+import FilesNavigation from '@/views/private/components/files-navigation.vue';
 import ReplaceFile from '../components/replace-file.vue';
 import FilesNotFound from './not-found.vue';
 
@@ -244,6 +237,7 @@ const { confirmLeave, leaveTo } = useEditsGuard(hasEdits);
 
 const confirmDelete = ref(false);
 const editActive = ref(false);
+
 const fileSrc = computed(() => {
 	if (item.value && item.value.modified_on) {
 		return `assets/${props.primaryKey}?cache-buster=${item.value.modified_on}&key=system-large-contain`;
@@ -290,6 +284,7 @@ const fieldsFiltered = computed(() => {
 
 function navigateBack() {
 	const backState = router.options.history.state.back;
+
 	if (typeof backState !== 'string' || !backState.startsWith('/login')) {
 		router.back();
 		return;
@@ -350,6 +345,7 @@ async function saveAsCopyAndNavigate() {
 async function deleteAndQuit() {
 	try {
 		await remove();
+		edits.value = {};
 		router.replace(to.value);
 	} catch {
 		// `remove` will show the unexpected error dialog

@@ -156,10 +156,10 @@
 	</v-menu>
 </template>
 
-<script lang="ts" setup>
+<script setup lang="ts">
 import Color from 'color';
 import { isHex } from '@/utils/is-hex';
-import { cssVar } from '@directus/shared/utils/browser';
+import { cssVar } from '@directus/utils/browser';
 import { ComponentPublicInstance, computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { i18n } from '@/lang';
@@ -286,9 +286,11 @@ function useColor() {
 			let alpha = Math.round(255 * color.value.alpha())
 				.toString(16)
 				.toUpperCase();
+
 			alpha = alpha.padStart(2, '0');
 			return color.value.rgb().array().length === 4 ? `${color.value.hex()}${alpha}` : color.value.hex();
 		}
+
 		return null;
 	};
 
@@ -302,8 +304,11 @@ function useColor() {
 
 	const rgb = computed<number[]>({
 		get() {
-			const arr = color.value !== null ? color.value.rgb().array() : props.opacity ? [0, 0, 0, 1] : [0, 0, 0];
-			return arr.length === 4 ? [...arr.slice(0, -1).map(Math.round), arr[3]] : arr.map(Math.round);
+			if (color.value !== null) {
+				return roundColorValues(color.value.rgb().array());
+			}
+
+			return roundColorValues(props.opacity ? [0, 0, 0, 1] : [0, 0, 0]);
 		},
 		set(newRGB) {
 			setColor(Color.rgb(newRGB).alpha(newRGB.length === 4 ? newRGB[3] : 1));
@@ -312,8 +317,11 @@ function useColor() {
 
 	const hsl = computed<number[]>({
 		get() {
-			const arr = color.value !== null ? color.value.hsl().array() : props.opacity ? [0, 0, 0, 1] : [0, 0, 0];
-			return arr.length === 4 ? [...arr.slice(0, -1).map(Math.round), arr[3]] : arr.map(Math.round);
+			if (color.value !== null) {
+				return roundColorValues(color.value.hsl().array());
+			}
+
+			return roundColorValues(props.opacity ? [0, 0, 0, 1] : [0, 0, 0]);
 		},
 		set(newHSL) {
 			setColor(Color.hsl(newHSL).alpha(newHSL.length === 4 ? newHSL[3] : 1));
@@ -342,6 +350,7 @@ function useColor() {
 			if (newAlpha === null) {
 				return;
 			}
+
 			const newColor = color.value !== null ? color.value.rgb().array() : [0, 0, 0];
 			setColor(Color(newColor).alpha(newAlpha / 100));
 		},
@@ -358,6 +367,15 @@ function useColor() {
 			emit('input', getHexa());
 		}
 	}
+
+	function roundColorValues(arr: number[]): number[] {
+		if (arr.length === 4) {
+			// Do not round the opacity
+			return [...arr.slice(0, -1).map((x) => Math.round(x)), arr[3]];
+		}
+
+		return arr.map((x) => Math.round(x));
+	}
 }
 </script>
 
@@ -369,8 +387,9 @@ function useColor() {
 
 	position: relative;
 	box-sizing: border-box;
-	width: calc(var(--input-height) - 12px);
-	max-height: calc(var(--input-height) - 12px);
+	margin-left: -8px;
+	width: calc(var(--input-height) - 20px);
+	max-height: calc(var(--input-height) - 20px);
 	overflow: hidden;
 	border-radius: calc(var(--border-radius) + 2px);
 	cursor: pointer;
@@ -406,14 +425,12 @@ function useColor() {
 	padding-right: 0px;
 }
 
-.v-input.html-color-select {
-	width: 0;
-	height: 0;
-	visibility: hidden;
-}
-
-.color-input :deep(.input) {
-	padding-left: 6px;
+.color-input {
+	.v-input.html-color-select {
+		width: 0;
+		height: 0;
+		visibility: hidden;
+	}
 }
 
 .color-data-inputs {

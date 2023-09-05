@@ -1,15 +1,7 @@
 import { defineStore } from 'pinia';
 import { has, isEmpty, orderBy, cloneDeep } from 'lodash';
-import {
-	InterfaceConfig,
-	DisplayConfig,
-	DeepPartial,
-	Field,
-	Relation,
-	Collection,
-	LocalType,
-} from '@directus/shared/types';
-import { LOCAL_TYPES } from '@directus/shared/constants';
+import { InterfaceConfig, DisplayConfig, DeepPartial, Field, Relation, Collection, LocalType } from '@directus/types';
+import { LOCAL_TYPES } from '@directus/constants';
 import { computed } from 'vue';
 import { get, set } from 'lodash';
 import { unexpectedError } from '@/utils/unexpected-error';
@@ -21,6 +13,7 @@ import * as alterations from './alterations';
 import { getLocalTypeForField } from '@/utils/get-local-type';
 import api from '@/api';
 import { useExtensions } from '@/extensions';
+import { getEndpoint } from '@directus/utils';
 
 export function syncFieldDetailStoreProperty(path: string, defaultValue?: any) {
 	const fieldDetailStore = useFieldDetailStore();
@@ -123,6 +116,7 @@ export const useFieldDetailStore = defineStore({
 					this.loading = true;
 					const response = await api.get(`/fields/${collection}/${field}`);
 					const fetchedFieldMeta = response.data?.data?.meta;
+
 					this.$patch({
 						field: {
 							meta: {
@@ -162,6 +156,7 @@ export const useFieldDetailStore = defineStore({
 			}
 
 			const localType = getCurrent('localType') as (typeof LOCAL_TYPES)[number] | undefined;
+
 			if (localType) {
 				alterations[localType].applyChanges(updates, this, helperFn);
 			}
@@ -173,8 +168,10 @@ export const useFieldDetailStore = defineStore({
 
 			// Validation to prevent cyclic relation
 			const aliasesFromRelation: string[] = [];
+
 			for (const relation of Object.values(this.relations)) {
 				if (!relation || !relation.collection || !relation.field) continue;
+
 				if (
 					// Duplicate checks for O2M & M2O
 					(relation.collection === relation.related_collection && relation.field === relation.meta?.one_field) ||
@@ -185,16 +182,19 @@ export const useFieldDetailStore = defineStore({
 				) {
 					throw new Error('Field key cannot be the same as foreign key');
 				}
+
 				// Track fields used for M2M & M2A
 				if (this.collection === relation.related_collection && relation.meta?.one_field) {
 					aliasesFromRelation.push(`${relation.collection}:${relation.field}`);
 					aliasesFromRelation.push(`${this.collection}:${relation.meta.one_field}`);
 				}
 			}
+
 			// Duplicate field check for M2A
 			const addedFields = Object.values(this.fields)
 				.map((field) => (field && field.collection && field.field ? `${field.collection}:${field.field}` : null))
 				.filter((field) => field);
+
 			if (addedFields.some((field) => addedFields.indexOf(field) !== addedFields.lastIndexOf(field))) {
 				throw new Error('Duplicate fields cannot be created');
 			}
@@ -224,7 +224,7 @@ export const useFieldDetailStore = defineStore({
 				}
 
 				for (const collection of Object.keys(this.items)) {
-					await api.post(`/items/${collection}`, this.items[collection]);
+					await api.post(getEndpoint(collection), this.items[collection]);
 				}
 
 				await fieldsStore.hydrate();

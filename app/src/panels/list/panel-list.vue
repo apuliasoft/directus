@@ -31,6 +31,7 @@ import api from '@/api';
 import { useFieldsStore } from '@/stores/fields';
 import { useInsightsStore } from '@/stores/insights';
 import { unexpectedError } from '@/utils/unexpected-error';
+import { getEndpoint } from '@directus/utils';
 
 const props = withDefaults(
 	defineProps<{
@@ -61,7 +62,6 @@ const primaryKeyField = computed(() => fieldsStore.getPrimaryKeyFieldForCollecti
 function startEditing(item: Record<string, any>) {
 	if (!props.linkToItem) return;
 	currentlyEditing.value = item[primaryKeyField.value];
-	editsAtStart.value = item;
 }
 
 function cancelEdit() {
@@ -71,7 +71,7 @@ function cancelEdit() {
 
 async function saveEdits(item: Record<string, any>) {
 	try {
-		await api.patch(`/items/${props.collection}/${currentlyEditing.value}`, item);
+		await api.patch(`${getEndpoint(props.collection)}/${currentlyEditing.value}`, item);
 	} catch (err: any) {
 		unexpectedError(err);
 	}

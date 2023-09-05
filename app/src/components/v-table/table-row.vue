@@ -38,9 +38,9 @@
 	</tr>
 </template>
 
-<script lang="ts" setup>
+<script setup lang="ts">
 import { computed } from 'vue';
-import { ShowSelect } from '@directus/shared/types';
+import { ShowSelect } from '@directus/types';
 import { Header, Item } from './types';
 
 interface Props {

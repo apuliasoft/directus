@@ -27,7 +27,7 @@
 		</template>
 
 		<template #sidebar>
-			<sidebar-detail icon="info_outline" :title="t('information')" close>
+			<sidebar-detail icon="info" :title="t('information')" close>
 				<div v-md="t('page_help_settings_flows_collection')" class="page-description" />
 			</sidebar-detail>
 		</template>
@@ -129,14 +129,14 @@
 	</private-view>
 </template>
 
-<script lang="ts" setup>
+<script setup lang="ts">
 import api from '@/api';
 import { Sort, Header } from '@/components/v-table/types';
 import { router } from '@/router';
 import { useFlowsStore } from '@/stores/flows';
 import { usePermissionsStore } from '@/stores/permissions';
 import { unexpectedError } from '@/utils/unexpected-error';
-import { FlowRaw } from '@directus/shared/types';
+import { FlowRaw } from '@directus/types';
 import { sortBy } from 'lodash';
 import { computed, ref, Ref } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -245,6 +245,7 @@ async function toggleFlowStatusById(id: string, value: string) {
 		await api.patch(`/flows/${id}`, {
 			status: value === 'active' ? 'inactive' : 'active',
 		});
+
 		await flowsStore.hydrate();
 	} catch (error) {
 		unexpectedError(error as Error);

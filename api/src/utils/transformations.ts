@@ -1,70 +1,57 @@
-import { isNil } from 'lodash';
-import {
-	File,
-	Transformation,
-	TransformationParams,
-	TransformationPreset,
-	TransformationPresetFormat,
-	TransformationPresetResize,
-} from '../types';
+import type { File, Transformation, TransformationFormat, TransformationSet } from '../types/index.js';
 
-// Extract transforms from a preset
-export function resolvePreset(input: TransformationParams | TransformationPreset, file: File): Transformation[] {
-	// Do the format conversion last
-	return [extractResize(input), ...(input.transforms ?? []), extractToFormat(input, file)].filter(
-		(transform): transform is Transformation => transform !== undefined
-	);
+export function resolvePreset({ transformationParams, acceptFormat }: TransformationSet, file: File): Transformation[] {
+	const transforms = transformationParams.transforms ? [...transformationParams.transforms] : [];
+
+	if (transformationParams.format || transformationParams.quality) {
+		transforms.push([
+			'toFormat',
+			getFormat(file, transformationParams.format, acceptFormat),
+			{
+				quality: transformationParams.quality ? Number(transformationParams.quality) : undefined,
+			},
+		]);
+	}
+
+	if (transformationParams.width || transformationParams.height) {
+		transforms.push([
+			'resize',
+			{
+				width: transformationParams.width ? Number(transformationParams.width) : undefined,
+				height: transformationParams.height ? Number(transformationParams.height) : undefined,
+				fit: transformationParams.fit,
+				withoutEnlargement: transformationParams.withoutEnlargement
+					? Boolean(transformationParams.withoutEnlargement)
+					: undefined,
+			},
+		]);
+	}
+
+	return transforms;
 }
 
-function extractOptions<T extends Record<string, any>>(
-	keys: (keyof T)[],
-	numberKeys: (keyof T)[] = [],
-	booleanKeys: (keyof T)[] = []
-) {
-	return function (input: TransformationParams | TransformationPreset): T {
-		return Object.entries(input).reduce(
-			(config, [key, value]) =>
-				keys.includes(key as any) && isNil(value) === false
-					? {
-							...config,
-							[key]: numberKeys.includes(key as any)
-								? +value
-								: booleanKeys.includes(key as any)
-								? Boolean(value)
-								: value,
-					  }
-					: config,
-			{} as T
-		);
-	};
-}
+function getFormat(
+	file: File,
+	format: TransformationSet['transformationParams']['format'],
+	acceptFormat: TransformationSet['acceptFormat']
+): TransformationFormat {
+	const fileType = file.type?.split('/')[1] as TransformationFormat | undefined;
 
-// Extract format transform from a preset
-function extractToFormat(input: TransformationParams | TransformationPreset, file: File): Transformation | undefined {
-	const options = extractOptions<TransformationPresetFormat>(['format', 'quality'], ['quality'])(input);
-	return Object.keys(options).length > 0
-		? [
-				'toFormat',
-				options.format || (file.type!.split('/')[1] as any),
-				{
-					quality: options.quality,
-				},
-		  ]
-		: undefined;
-}
+	if (format) {
+		if (format !== 'auto') {
+			return format;
+		}
 
-function extractResize(input: TransformationParams | TransformationPreset): Transformation | undefined {
-	const resizable = ['width', 'height'].some((key) => key in input);
-	if (!resizable) return undefined;
+		if (acceptFormat) {
+			return acceptFormat;
+		}
 
-	return [
-		'resize',
-		extractOptions<TransformationPresetResize>(
-			['width', 'height', 'fit', 'withoutEnlargement'],
-			['width', 'height'],
-			['withoutEnlargement']
-		)(input),
-	];
+		if (fileType && ['avif', 'webp', 'tiff'].includes(fileType)) {
+			return 'png';
+		}
+	}
+
+	return fileType || 'jpg';
 }
 
 /**

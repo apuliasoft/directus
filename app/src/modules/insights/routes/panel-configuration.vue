@@ -93,13 +93,13 @@
 	</v-drawer>
 </template>
 
-<script lang="ts" setup>
+<script setup lang="ts">
 import { useDialogRoute } from '@/composables/use-dialog-route';
 import { useExtension } from '@/composables/use-extension';
 import { useExtensions } from '@/extensions';
 import { useInsightsStore } from '@/stores/insights';
 import { CreatePanel } from '@/stores/insights';
-import { Panel } from '@directus/shared/types';
+import { Panel } from '@directus/types';
 import { assign, clone, omitBy, isUndefined } from 'lodash';
 import { nanoid } from 'nanoid/non-secure';
 import { storeToRefs } from 'pinia';

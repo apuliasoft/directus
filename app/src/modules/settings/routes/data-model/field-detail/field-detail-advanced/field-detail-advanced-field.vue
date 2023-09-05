@@ -38,7 +38,8 @@
 						name: t('language'),
 						meta: {
 							interface: 'system-language',
-							width: 'half',
+							width: 'full',
+							required: true,
 							display: 'formatted-value',
 							display_options: {
 								font: 'monospace',
@@ -54,8 +55,9 @@
 						type: 'string',
 						name: t('translation'),
 						meta: {
-							interface: 'input',
-							width: 'half',
+							interface: 'input-multiline',
+							width: 'full',
+							required: true,
 							options: {
 								placeholder: t('translation_placeholder'),
 							},
@@ -69,27 +71,22 @@
 	</div>
 </template>
 
-<script lang="ts">
-import { useI18n } from 'vue-i18n';
-import { defineComponent, computed } from 'vue';
-import { useFieldDetailStore, syncFieldDetailStoreProperty } from '../store';
+<script setup lang="ts">
 import { storeToRefs } from 'pinia';
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { syncFieldDetailStoreProperty, useFieldDetailStore } from '../store';
 
-export default defineComponent({
-	setup() {
-		const { t } = useI18n();
-		const fieldDetailStore = useFieldDetailStore();
-		const readonly = syncFieldDetailStoreProperty('field.meta.readonly', false);
-		const hidden = syncFieldDetailStoreProperty('field.meta.hidden', false);
-		const required = syncFieldDetailStoreProperty('field.meta.required', false);
-		const note = syncFieldDetailStoreProperty('field.meta.note');
-		const translations = syncFieldDetailStoreProperty('field.meta.translations');
-		const { loading, field } = storeToRefs(fieldDetailStore);
-		const type = computed(() => field.value.type);
-		const isGenerated = computed(() => field.value.schema?.is_generated);
-		return { t, loading, readonly, hidden, required, note, translations, type, isGenerated };
-	},
-});
+const { t } = useI18n();
+const fieldDetailStore = useFieldDetailStore();
+const readonly = syncFieldDetailStoreProperty('field.meta.readonly', false);
+const hidden = syncFieldDetailStoreProperty('field.meta.hidden', false);
+const required = syncFieldDetailStoreProperty('field.meta.required', false);
+const note = syncFieldDetailStoreProperty('field.meta.note');
+const translations = syncFieldDetailStoreProperty('field.meta.translations');
+const { loading, field } = storeToRefs(fieldDetailStore);
+const type = computed(() => field.value.type);
+const isGenerated = computed(() => field.value.schema?.is_generated);
 </script>
 
 <style lang="scss" scoped>

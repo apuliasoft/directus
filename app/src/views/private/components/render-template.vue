@@ -3,17 +3,22 @@
 		<span class="vertical-aligner" />
 		<template v-for="(part, index) in parts" :key="index">
 			<value-null v-if="part === null || (typeof part === 'object' && part.value === null)" />
-			<component
-				:is="`display-${part.component}`"
-				v-else-if="typeof part === 'object' && part.component"
-				v-bind="part.options"
-				:value="part.value"
-				:interface="part.interface"
-				:interface-options="part.interfaceOptions"
-				:type="part.type"
-				:collection="part.collection"
-				:field="part.field"
-			/>
+			<v-error-boundary v-else-if="typeof part === 'object' && part.component" :name="`display-${part.component}`">
+				<component
+					:is="`display-${part.component}`"
+					v-bind="part.options"
+					:value="part.value"
+					:interface="part.interface"
+					:interface-options="part.interfaceOptions"
+					:type="part.type"
+					:collection="part.collection"
+					:field="part.field"
+				/>
+
+				<template #fallback>
+					<span>{{ part.value }}</span>
+				</template>
+			</v-error-boundary>
 			<span v-else-if="typeof part === 'string'" :dir="direction">{{ translate(part) }}</span>
 			<span v-else>{{ part }}</span>
 		</template>
@@ -27,7 +32,7 @@ import { cloneArraysWithStringIndexes } from '@/utils/clone-objects';
 import { extractEdits } from '@/utils/extract-edits-from-item';
 import { getDefaultDisplayForType } from '@/utils/get-default-display-for-type';
 import { translate } from '@/utils/translate-literal';
-import { Field } from '@directus/shared/types';
+import { Field } from '@directus/types';
 import { cloneDeepWith, get } from 'lodash';
 import { computed, ref } from 'vue';
 
@@ -75,9 +80,12 @@ const parts = computed(() =>
 
 function handleArray(item: Record<string, any>, fieldKeyBefore: string, fieldKeyAfter: string) {
 	const value = get(item, fieldKeyBefore);
-	const field =
-		fieldsStore.getField(props.collection, fieldKeyBefore) ||
-		props.fields?.find((field) => field.field === fieldKeyBefore);
+
+	let field: Field | null = props.fields?.find((field) => field.field === fieldKeyBefore) ?? null;
+
+	if (props.collection) {
+		field = fieldsStore.getField(props.collection, fieldKeyBefore);
+	}
 
 	if (value === undefined) return null;
 
@@ -85,7 +93,7 @@ function handleArray(item: Record<string, any>, fieldKeyBefore: string, fieldKey
 
 	const displayInfo = useExtension(
 		'display',
-		computed(() => field.meta?.display ?? null)
+		computed(() => field?.meta?.display ?? null)
 	);
 
 	let component = field.meta?.display;
@@ -109,8 +117,11 @@ function handleArray(item: Record<string, any>, fieldKeyBefore: string, fieldKey
 }
 
 function handleObject(item: Record<string, any>, fieldKey: string) {
-	const field =
-		fieldsStore.getField(props.collection, fieldKey) || props.fields?.find((field) => field.field === fieldKey);
+	let field: Field | null = props.fields?.find((field) => field.field === fieldKey) ?? null;
+
+	if (props.collection) {
+		field = fieldsStore.getField(props.collection, fieldKey);
+	}
 
 	/**
 	 * This is for cases where you are rendering a display template directly on
@@ -140,7 +151,7 @@ function handleObject(item: Record<string, any>, fieldKey: string) {
 
 	const displayInfo = useExtension(
 		'display',
-		computed(() => field.meta?.display ?? null)
+		computed(() => field?.meta?.display ?? null)
 	);
 
 	// If used display doesn't exist in the current project, return raw value

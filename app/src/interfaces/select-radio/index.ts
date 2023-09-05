@@ -1,6 +1,6 @@
-import { defineInterface } from '@directus/shared/utils';
-import InterfaceSelectRadio from './select-radio.vue';
+import { defineInterface } from '@directus/utils';
 import PreviewSVG from './preview.svg?raw';
+import InterfaceSelectRadio from './select-radio.vue';
 
 export default defineInterface({
 	id: 'select-radio',
@@ -29,6 +29,7 @@ export default defineInterface({
 							name: '$t:text',
 							meta: {
 								width: 'half',
+								required: true,
 								interface: 'system-input-translated-string',
 							},
 						},
@@ -39,6 +40,7 @@ export default defineInterface({
 							meta: {
 								width: 'half',
 								interface: 'input',
+								required: true,
 								options: {
 									font: 'monospace',
 								},

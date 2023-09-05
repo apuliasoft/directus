@@ -13,7 +13,11 @@
 		collection="directus_users"
 		:reset-preset="resetPreset"
 	>
-		<private-view :title="title">
+		<private-view
+			:title="title"
+			:small-header="currentLayout?.smallHeader"
+			:header-shadow="currentLayout?.headerShadow"
+		>
 			<template v-if="breadcrumb" #headline>
 				<v-breadcrumb :items="breadcrumb" />
 			</template>
@@ -100,7 +104,7 @@
 
 			<users-invite v-if="canInviteUsers" v-model="userInviteModalActive" @update:model-value="refresh" />
 
-			<component :is="`layout-${layout}`" class="layout" v-bind="layoutState">
+			<component :is="`layout-${layout}`" v-bind="layoutState">
 				<template #no-results>
 					<v-info v-if="!filter && !search" :title="t('user_count', 0)" icon="people_alt" center>
 						{{ t('no_users_copy') }}
@@ -142,7 +146,7 @@
 			/>
 
 			<template #sidebar>
-				<sidebar-detail icon="info_outline" :title="t('information')" close>
+				<sidebar-detail icon="info" :title="t('information')" close>
 					<div v-md="t('page_help_users_collection')" class="page-description" />
 				</sidebar-detail>
 				<layout-sidebar-detail v-model="layout">
@@ -161,7 +165,7 @@
 	</component>
 </template>
 
-<script lang="ts" setup>
+<script setup lang="ts">
 import UsersInvite from '@/views/private/components/users-invite.vue';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -176,23 +180,17 @@ import { unexpectedError } from '@/utils/unexpected-error';
 import DrawerBatch from '@/views/private/components/drawer-batch.vue';
 import LayoutSidebarDetail from '@/views/private/components/layout-sidebar-detail.vue';
 import SearchInput from '@/views/private/components/search-input.vue';
-import { useLayout } from '@directus/shared/composables';
-import { Role } from '@directus/shared/types';
-import { mergeFilters } from '@directus/shared/utils';
+import { useLayout } from '@directus/composables';
+import { mergeFilters } from '@directus/utils';
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
 import useNavigation from '../composables/use-navigation';
+import { useExtension } from '@/composables/use-extension';
 
 type Item = {
 	[field: string]: any;
 };
 
-interface Props {
-	role: string | null;
-}
-
-const props = withDefaults(defineProps<Props>(), {
-	role: null,
-});
+const props = defineProps<{ role?: string }>();
 
 const { t } = useI18n();
 
@@ -208,12 +206,14 @@ const selection = ref<Item[]>([]);
 const { layout, layoutOptions, layoutQuery, filter, search, resetPreset } = usePreset(ref('directus_users'));
 const { addNewLink } = useLinks();
 
+const currentLayout = useExtension('layout', layout);
+
 const { confirmDelete, deleting, batchDelete, batchEditActive } = useBatch();
 
 const { breadcrumb, title } = useBreadcrumb();
 
 const roleFilter = computed(() => {
-	if (props.role !== null) {
+	if (props.role) {
 		return {
 			_and: [
 				{
@@ -231,12 +231,13 @@ const roleFilter = computed(() => {
 const canInviteUsers = computed(() => {
 	if (serverStore.auth.disableDefault === true) return false;
 
-	const isAdmin = !!userStore.currentUser?.role?.admin_access;
+	const isAdmin = !!userStore.currentUser?.role.admin_access;
 	if (isAdmin) return true;
 
 	const usersCreatePermission = permissionsStore.permissions.find(
 		(permission) => permission.collection === 'directus_users' && permission.action === 'create'
 	);
+
 	const rolesReadPermission = permissionsStore.permissions.find(
 		(permission) => permission.collection === 'directus_roles' && permission.action === 'read'
 	);
@@ -251,6 +252,7 @@ const { batchEditAllowed, batchDeleteAllowed, createAllowed } = usePermissions()
 onBeforeRouteLeave(() => {
 	selection.value = [];
 });
+
 onBeforeRouteUpdate(() => {
 	selection.value = [];
 });
@@ -314,7 +316,7 @@ function useBreadcrumb() {
 
 	const title = computed(() => {
 		if (!props.role) return t('user_directory');
-		return roles.value?.find((role: Role) => role.id === props.role)?.name;
+		return roles.value?.find((role) => role.id === props.role)?.name;
 	});
 
 	return { breadcrumb, title };
@@ -333,6 +335,7 @@ function usePermissions() {
 		const updatePermissions = permissionsStore.permissions.find(
 			(permission) => permission.action === 'update' && permission.collection === 'directus_users'
 		);
+
 		return !!updatePermissions;
 	});
 
@@ -343,6 +346,7 @@ function usePermissions() {
 		const deletePermissions = permissionsStore.permissions.find(
 			(permission) => permission.action === 'delete' && permission.collection === 'directus_users'
 		);
+
 		return !!deletePermissions;
 	});
 
@@ -353,6 +357,7 @@ function usePermissions() {
 		const createPermissions = permissionsStore.permissions.find(
 			(permission) => permission.action === 'create' && permission.collection === 'directus_users'
 		);
+
 		return !!createPermissions;
 	});
 
@@ -368,9 +373,5 @@ function usePermissions() {
 
 .header-icon {
 	--v-button-color-disabled: var(--foreground-normal);
-}
-
-.layout {
-	--layout-offset-top: 64px;
 }
 </style>

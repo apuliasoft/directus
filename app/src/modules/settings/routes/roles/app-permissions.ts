@@ -1,4 +1,4 @@
-import { Permission } from '@directus/shared/types';
+import { Permission } from '@directus/types';
 
 export const appRecommendedPermissions: Partial<Permission>[] = [
 	{
@@ -306,6 +306,10 @@ export const appMinimalPermissions: Partial<Permission>[] = [
 	},
 	{
 		collection: 'directus_settings',
+		action: 'read',
+	},
+	{
+		collection: 'directus_translations',
 		action: 'read',
 	},
 	{

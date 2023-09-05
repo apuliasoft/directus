@@ -5,6 +5,40 @@ const defaultRules = {
 	'no-debugger': process.env.NODE_ENV !== 'development' ? 'error' : 'off',
 	// Enforce prettier formatting
 	'prettier/prettier': 'error',
+	'padding-line-between-statements': [
+		'error',
+		{
+			blankLine: 'always',
+			prev: [
+				'block',
+				'block-like',
+				'cjs-export',
+				'class',
+				'export',
+				'import',
+				'multiline-block-like',
+				'multiline-const',
+				'multiline-expression',
+				'multiline-let',
+				'multiline-var',
+			],
+			next: '*',
+		},
+		{
+			blankLine: 'always',
+			prev: ['const', 'let'],
+			next: ['block', 'block-like', 'cjs-export', 'class', 'export', 'import'],
+		},
+		{
+			blankLine: 'always',
+			prev: '*',
+			next: ['multiline-block-like', 'multiline-const', 'multiline-expression', 'multiline-let', 'multiline-var'],
+		},
+		{ blankLine: 'any', prev: ['export', 'import'], next: ['export', 'import'] },
+	],
+	'lines-between-class-members': ['error', 'always', { exceptAfterSingleLine: true }],
+	'no-nested-ternary': 'error',
+	curly: ['error', 'multi-line'],
 };
 
 module.exports = {
@@ -20,17 +54,11 @@ module.exports = {
 	extends: ['eslint:recommended', 'prettier'],
 	rules: defaultRules,
 	parserOptions: {
-		ecmaVersion: 2020,
+		ecmaVersion: 2022,
+		sourceType: 'module',
 	},
 	overrides: [
-		// Parse config files as modules
-		{
-			files: ['rollup.config.js', 'vite?(st).config.js', 'api/globalSetup.js'],
-			parserOptions: {
-				sourceType: 'module',
-			},
-			rules: defaultRules,
-		},
+		// Jest
 		{
 			files: ['**/*.test.js'],
 			env: {
@@ -55,6 +83,7 @@ module.exports = {
 			rules: {
 				...defaultRules,
 				'vue/multi-word-component-names': 'off',
+				'vue/require-default-prop': 'off',
 				// It's recommended to turn off this rule on TypeScript projects
 				'no-undef': 'off',
 				// Allow ts-directive comments (used to suppress TypeScript compiler errors)

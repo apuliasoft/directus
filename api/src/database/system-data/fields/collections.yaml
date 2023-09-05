@@ -72,12 +72,14 @@ fields:
           meta:
             interface: system-language
             width: half
+            required: true
         - field: translation
           name: $t:field_options.directus_collections.collection_name
           type: string
           meta:
             interface: input
             width: half
+            required: true
             options:
               placeholder: $t:field_options.directus_collections.translation_placeholder
         - field: singular
@@ -96,6 +98,22 @@ fields:
             width: half
             options:
               placeholder: $t:field_options.directus_collections.translation_placeholder
+    width: full
+
+  - field: preview_divider
+    special:
+      - alias
+      - no-data
+    interface: presentation-divider
+    options:
+      icon: preview
+      title: $t:field_options.directus_collections.preview_divider
+    width: full
+
+  - field: preview_url
+    interface: system-display-template
+    options:
+      collectionField: collection
     width: full
 
   - field: archive_divider

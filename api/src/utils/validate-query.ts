@@ -1,17 +1,20 @@
+import type { Query } from '@directus/types';
 import Joi from 'joi';
-import { isPlainObject, uniq } from 'lodash';
-import { InvalidQueryException } from '../exceptions';
-import { Query } from '@directus/shared/types';
+import { isPlainObject, uniq } from 'lodash-es';
 import { stringify } from 'wellknown';
-import { calculateFieldDepth } from './calculate-field-depth';
-import env from '../env';
+import env from '../env.js';
+import { InvalidQueryException } from '../exceptions/invalid-query.js';
+import { calculateFieldDepth } from './calculate-field-depth.js';
 
 const querySchema = Joi.object({
 	fields: Joi.array().items(Joi.string()),
 	group: Joi.array().items(Joi.string()),
 	sort: Joi.array().items(Joi.string()),
 	filter: Joi.object({}).unknown(),
-	limit: Joi.number().integer().min(-1),
+	limit:
+		'QUERY_LIMIT_MAX' in env && env['QUERY_LIMIT_MAX'] !== -1
+			? Joi.number().integer().min(-1).max(env['QUERY_LIMIT_MAX']) // min should be 0
+			: Joi.number().integer().min(-1),
 	offset: Joi.number().integer().min(0),
 	page: Joi.number().integer().min(0),
 	meta: Joi.array().items(Joi.string().valid('total_count', 'filter_count')),
@@ -53,6 +56,7 @@ function validateFilter(filter: Query['filter']) {
 
 			switch (key) {
 				case '_in':
+				case '_in_all':
 				case '_nin':
 				case '_between':
 				case '_nbetween':
@@ -134,6 +138,7 @@ function validateList(value: any, key: string) {
 
 function validateBoolean(value: any, key: string) {
 	if (value === null) return true;
+
 	if (typeof value !== 'boolean') {
 		throw new InvalidQueryException(`"${key}" has to be a boolean`);
 	}
@@ -143,6 +148,7 @@ function validateBoolean(value: any, key: string) {
 
 function validateGeometry(value: any, key: string) {
 	if (value === null) return true;
+
 	try {
 		stringify(value);
 	} catch {
@@ -173,7 +179,7 @@ function validateAlias(alias: any) {
 }
 
 function validateRelationalDepth(query: Query) {
-	const maxRelationalDepth = Number(env.MAX_RELATIONAL_DEPTH) > 2 ? Number(env.MAX_RELATIONAL_DEPTH) : 2;
+	const maxRelationalDepth = Number(env['MAX_RELATIONAL_DEPTH']) > 2 ? Number(env['MAX_RELATIONAL_DEPTH']) : 2;
 
 	// Process the fields in the same way as api/src/utils/get-ast-from-query.ts
 	let fields = ['*'];
