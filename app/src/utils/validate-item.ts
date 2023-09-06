@@ -73,7 +73,10 @@ export function validateItem(item: Record<string, any>, fields: Field[], isNew: 
 		if (translationFields?.length) {
 			translationFields.forEach((translationField) => {
 				let translationItem = extractEdits(cloneDeepWith(item[translationField.name], cloneArraysWithStringIndexes));
-				translationItem = translationItem?.filter((item: any) => typeof item === 'object') ?? [{}];
+				translationItem = translationItem?.filter(
+					(item: any) => typeof item === 'object' && item?.lingue_codice.codice === 'it'
+				);
+				translationItem = !translationItem?.length ? [{}] : translationItem;
 				translationItem.forEach((languageItem: Record<string, any>) => {
 					translationsErrors.push(...validateItem(languageItem, translationField.fields, isNew));
 				});
