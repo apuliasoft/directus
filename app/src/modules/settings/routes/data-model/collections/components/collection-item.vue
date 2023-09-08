@@ -99,7 +99,7 @@ function onGroupSortChange(collections: Collection[]) {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .drag-container {
 	margin-top: 8px;
 	margin-left: 20px;
@@ -107,10 +107,6 @@ function onGroupSortChange(collections: Collection[]) {
 
 .collection-item {
 	margin-bottom: 8px;
-
-	&.hide {
-		display: none;
-	}
 }
 
 .collection-item-detail {
@@ -131,14 +127,6 @@ function onGroupSortChange(collections: Collection[]) {
 	color: var(--foreground-subdued);
 }
 
-.activator-icon {
-	transform: rotate(0deg);
-	transition: transform var(--medium) var(--transition);
-
-	&.active {
-		transform: rotate(90deg);
-	}
-}
 .collection-note {
 	margin-left: 16px;
 	overflow: hidden;

@@ -223,7 +223,6 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 						return {
 							text: field.name,
 							value: field.key,
-							key: field.key,
 							description,
 							width: localWidths.value[field.key] || layoutOptions.value?.widths?.[field.key] || null,
 							align: layoutOptions.value?.align?.[field.key] || 'left',
