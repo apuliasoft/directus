@@ -102,8 +102,6 @@ const writableFields = computed(() => {
 	);
 });
 
-let test: any;
-
 const translations = computed(() => {
 	if (!relationInfo.value) return [];
 
@@ -112,7 +110,6 @@ const translations = computed(() => {
 	const langField = relationInfo.value.junctionField.field;
 
 	return props.value.map((item) => {
-		test = item.value;
 		const filledFields = writableFields.value.filter((field) => {
 			return field.field in item && !isNil(item?.[field.field]);
 		}).length;
