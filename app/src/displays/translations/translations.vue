@@ -5,6 +5,7 @@
 			:template="internalTemplate"
 			:item="displayItem"
 			:collection="relationInfo.junctionCollection.collection"
+			:title="displayItem.valore"
 		/>
 		<v-menu class="menu" show-arrow :disabled="value.length === 0">
 			<template #activator="{ toggle, deactivate, active }">
@@ -25,6 +26,7 @@
 							:template="internalTemplate"
 							:item="item.item"
 							:collection="relationInfo.junctionCollection.collection"
+							:title="item.item.valore"
 						/>
 					</v-list-item-content>
 				</v-list-item>
