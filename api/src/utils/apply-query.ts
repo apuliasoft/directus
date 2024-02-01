@@ -731,7 +731,6 @@ export function applyFilter(
 			}
 
 			if (operator === '_in_all') {
-				// TODO: throw exception?
 				if (!originalCollectionName) return;
 
 				let value = compareValue;
@@ -740,23 +739,83 @@ export function applyFilter(
 				const mainCollection = (rootQuery as any)._single.table;
 				const mainCollectionPK = schema.collections[mainCollection]!.primary;
 
-				const relationsToMainCollection = relations.filter(
-					(r) => r.collection === originalCollectionName && r.related_collection === mainCollection
-				);
+				const joinsPath = buildShortestJoinsPath([{ name: originalCollectionName, joinPath: [] }], mainCollection);
 
-				// TODO: throw exception?
-				if (relationsToMainCollection.length > 1) return;
-				const relation = relationsToMainCollection[0]!;
+				function buildShortestJoinsPath(
+					collections: Array<{
+						name: string;
+						joinPath: Array<{ collection: string; firstJoinId: string; secondJoinId: string }>;
+					}>,
+					destCollection: string
+				) {
+					for (const coll of collections) {
+						const relation = relations.find(
+							(r) => r.related_collection === destCollection && r.collection === coll.name
+						);
+						if (!!relation) {
+							coll.joinPath.push({
+								collection: coll.name,
+								firstJoinId: coll.name.concat('.', relation.field),
+								secondJoinId: relation.related_collection!.concat('.', relation.schema?.foreign_key_column ?? ''),
+							});
+							return coll;
+						}
+					}
 
-				value.forEach((v: any) =>
-					dbQuery[logical].whereExists(
-						knex
-							.select('*')
-							.from(originalCollectionName)
-							.where(`${originalCollectionName}.${field}`, '=', v)
-							.andWhereRaw(`${originalCollectionName}.${relation.field} = ${mainCollection}.${mainCollectionPK}`)
-					)
-				);
+					let relatedCollections: Array<{
+						name: string;
+						joinPath: Array<{ collection: string; firstJoinId: string; secondJoinId: string }>;
+					}> = [];
+
+					for (const coll of collections) {
+						const outRelations = relations.filter((r) => r.collection === coll.name && !!r.related_collection);
+						const inRelations = relations.filter((r) => r.related_collection === coll.name);
+
+						const addCollectionsRelations = (relations: Relation[], direction: 'in' | 'out') => {
+							return relations.map((r) => {
+								return {
+									name: direction === 'in' ? r.collection ?? '' : r.related_collection ?? '',
+									joinPath: [
+										...coll.joinPath,
+										{
+											collection: coll.name,
+											firstJoinId: r.collection.concat('.', r.field),
+											secondJoinId: r.related_collection!.concat('.', r.schema?.foreign_key_column ?? ''),
+										},
+									],
+								};
+							});
+						};
+
+						relatedCollections = [
+							...relatedCollections,
+							...addCollectionsRelations(outRelations, 'out'),
+							...addCollectionsRelations(inRelations, 'in'),
+						];
+					}
+
+					return buildShortestJoinsPath(relatedCollections, destCollection);
+				}
+
+				value.forEach((v: any) => {
+					let query = knex.select('*').from(originalCollectionName);
+					let lastJoinId;
+					joinsPath.joinPath.forEach((join, index) => {
+						let nextCollection;
+						if (joinsPath.joinPath.length <= index + 1) {
+							lastJoinId = join.firstJoinId;
+						} else {
+							nextCollection = joinsPath.joinPath[index + 1]?.collection;
+							if (!!nextCollection) {
+								query = query.join(nextCollection, join.firstJoinId, join.secondJoinId);
+							}
+						}
+					});
+					query = query
+						.where(`${originalCollectionName}.${field}`, '=', v)
+						.andWhereRaw(`${lastJoinId} = ${mainCollection}.${mainCollectionPK}`);
+					dbQuery[logical].whereExists(query);
+				});
 			}
 
 			if (operator === '_nin') {
