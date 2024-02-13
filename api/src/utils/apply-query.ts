@@ -747,7 +747,14 @@ export function applyFilter(
 						joinPath: Array<{ collection: string; firstJoinId: string; secondJoinId: string }>;
 					}>,
 					destCollection: string
-				) {
+				): {
+					name: string;
+					joinPath: {
+						collection: string;
+						firstJoinId: string;
+						secondJoinId: string;
+					}[];
+				} {
 					for (const coll of collections) {
 						const relation = relations.find(
 							(r) => r.related_collection === destCollection && r.collection === coll.name
