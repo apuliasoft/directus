@@ -41,12 +41,7 @@ export class FilesService extends ItemsService {
 		let existingFile = {};
 
 		if (primaryKey !== undefined) {
-			existingFile =
-				(await this.knex
-					.select('folder', 'filename_download')
-					.from('directus_files')
-					.where({ id: primaryKey })
-					.first()) ?? {};
+			existingFile = (await this.knex.select('*').from('directus_files').where({ id: primaryKey }).first()) ?? {};
 		}
 
 		const payload = { ...existingFile, ...clone(data) };
