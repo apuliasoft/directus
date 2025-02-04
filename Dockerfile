@@ -9,6 +9,7 @@ WORKDIR /directus
 ENV NODE_OPTIONS=--max-old-space-size=8192
 
 COPY package.json .
+RUN npm install -g corepack@latest
 RUN corepack enable && corepack prepare
 
 COPY pnpm-lock.yaml .
